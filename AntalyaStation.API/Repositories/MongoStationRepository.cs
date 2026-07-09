@@ -3,8 +3,11 @@ using AntalyaStation.API.Models; // Station modelini kullanmak için
 using MongoDB.Driver;            // MongoDB kütüphanesi
 using Microsoft.Extensions.Options; // Ayarları okumak için
 
-namespace AntalyaStation.API.Repositories
-{
+using AntalyaStation.API.Data; // MongoDbSettings sınıfını kullanmak için
+
+namespace AntalyaStation.API.Repositories //IStationRepository'den türetilir ve MongoDB komutlarını bizzat çalıştırır.
+{//MongoDB Driver ile doğrudan konuşan tek yerdir. Service katmanından gelen o tertemiz istasyon listesini alır ve _collection.InsertManyAsync(stations) diyerek veritabanına fırlatır.
+
     public class MongoStationRepository : IStationRepository
     {
         private readonly IMongoCollection<Station> _stations;
@@ -30,6 +33,16 @@ namespace AntalyaStation.API.Repositories
                 .ToListAsync();
 
             return (data, totalCount);
+        }
+
+        public async Task InsertManyAsync(List<Station> stations)
+        {
+            // Veritabanında mükerrer (aynı) kayıt olmasın diye önce mevcutları temizleyebilir veya direkt ekleyebilirsin.
+            // Şimdilik gelen listeyi topluca MongoDB'ye fırlatıyoruz:
+            if (stations != null && stations.Any())
+            {
+                await _stations.InsertManyAsync(stations);
+            }
         }
     }
 }

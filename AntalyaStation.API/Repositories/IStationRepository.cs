@@ -4,7 +4,7 @@ namespace AntalyaStation.API.Repositories
 {
     public interface IStationRepository
     {
-        // Sayfalama (Pagination) için veriyi getiren imza
-        Task<(List<Station> Data, int TotalCount)> GetPagedStationsAsync(int pageNumber, int pageSize);
+        Task<(List<Station> Data, int TotalCount)> GetPagedStationsAsync(int pageNumber, int pageSize);// Sayfalama (Pagination) için veriyi getiren imza
+        Task InsertManyAsync(List<Station> stations); //Toplu istasyon ekleme
     }
-}
+}//(Interface): Yapılabilecek işlemleri listeler (GetById, GetAll, Create, Update, Delete)

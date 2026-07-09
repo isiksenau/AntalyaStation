@@ -1,4 +1,4 @@
-﻿namespace AntalyaStation.API.Models
+﻿namespace AntalyaStation.API.Data
 {
     // appsettings.json'daki verileri buraya eşleyeceğiz
     public class MongoDbSettings

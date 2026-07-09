@@ -1,25 +1,43 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using AntalyaStation.API.Repositories; // Repository'ye erişmek için
+using AntalyaStation.API.Repositories;
 
-namespace AntalyaStation.API.Controllers
-{
-    [ApiController]
-    [Route("api/[controller]")] // Adresi: api/stations olacak
-    public class StationsController : ControllerBase
+namespace AntalyaStation.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")] // Adresi: api/stations olacak
+public class StationController : ControllerBase
+{//İstasyonları listeleme (GET), silme (DELETE) ve güncelleme (PUT) kapıları.
+    private readonly IStationRepository _stationRepository;
+
+    // Veritabanı sorgu katmanını (Repository) Dependency Injection ile içeri alıyoruz
+    public StationController(IStationRepository stationRepository)
     {
-        private readonly IStationRepository _repository;
+        _stationRepository = stationRepository;
+    }
 
-        public StationsController(IStationRepository repository)
+    /// <summary>
+    /// MongoDB'deki istasyonları sayfa numarası ve sayfa boyutuna göre filtreleyerek getirir.
+    /// Bu yapı Blazor tarafında performanslı bir listeleme (Pagination) yapmamızı sağlayacak.
+    /// </summary>
+    [HttpGet] // GET isteği atıldığında çalışır
+    public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+    {
+        // Sayfalama parametrelerinin negatif değerler olmaması için güvenlik kontrolü
+        if (pageNumber < 1 || pageSize < 1)
         {
-            _repository = repository;
+            return BadRequest("Sayfa numarası (pageNumber) ve sayfa boyutu (pageSize) 1'den küçük olamaz.");
         }
 
-        [HttpGet] // GET isteği atıldığında çalışır
-        public async Task<IActionResult> GetStations(int page = 1, int size = 10)
+        // Veritabanından hem o sayfaya ait verileri hem de toplam kayıt sayısını aynı anda çekiyoruz
+        var (stations, totalCount) = await _stationRepository.GetPagedStationsAsync(pageNumber, pageSize);
+
+        // UI katmanının (Blazor) sayfalamayı doğru çizebilmesi için gerekli meta bilgileriyle birlikte dönüyoruz
+        return Ok(new
         {
-            var result = await _repository.GetPagedStationsAsync(page, size);
-            // Veriyi JSON formatında döndür
-            return Ok(new { Data = result.Data, TotalCount = result.TotalCount });
-        }
+            TotalCount = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            Data = stations
+        });
     }
 }

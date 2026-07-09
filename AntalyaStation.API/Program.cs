@@ -1,31 +1,57 @@
-using AntalyaStation.API.Models; 
+using AntalyaStation.API.Data;
 using AntalyaStation.API.Repositories;
+using AntalyaStation.API.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Ayarları appsettings.json'dan okuyup MongoDbSettings sınıfına bağla
+// ==========================================
+// 1. AYARLAR VE DIŞ KÜTÜPHANE YAPILANDIRMALARI
+// ==========================================
+// Veritabanı bağlantı ayarlarını appsettings.json'dan okuyoruz.
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 
-// 2. Repository'yi sisteme tanıt (Dependency Injection)
+// EPPlus Excel kütüphanesinin lisans ayarını yapıyoruz.
+OfficeOpenXml.ExcelPackage.License.SetNonCommercialPersonal("isu");
+
+// ==========================================
+// 2. BAĞIMLILIKLARIN ENJEKTE EDİLMESİ (Dependency Injection)
+// ==========================================
+// Veritabanı sorgularını yürütecek olan Repository katmanımızı sisteme tanıtıyoruz.
 builder.Services.AddScoped<IStationRepository, MongoStationRepository>();
 
-// 3. Controller'ları (api endpoint'lerini) ekle
+// Excel dosyalarını okuyacak olan akıllı Servis katmanımızı sisteme tanıtıyoruz (Az önce eksik olan yer!).
+builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
+
+// API Controller (Dış kapı) mimarisini projeye dahil ediyoruz.
 builder.Services.AddControllers();
 
-// 4. OpenAPI (Swagger) desteği (İstersen kalsın, istemezsen silebilirsin)
-builder.Services.AddOpenApi();
+// Swagger (Arayüz test ekranı) motorlarını sisteme ekliyoruz.
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
+// ==========================================
+// 3. UYGULAMANIN İNŞA EDİLMESİ (BUILD)
+// ==========================================
+// Bu satırdan sonra yukarıdaki "builder.Services" alanına hiçbir şey eklenemez!
 var app = builder.Build();
 
-// 5. Geliştirme ortamındaysan OpenAPI arayüzünü göster
+// ==========================================
+// 4. HTTP REQUEST PIPELINE (MIDDLEWARES)
+// ==========================================
+// Geliştirme ortamındaysak Swagger arayüzünü tarayıcıya açıyoruz.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
+// Güvenlik, HTTPS yönlendirmesi ve Controller haritalama işlemleri.
 app.UseHttpsRedirection();
-
-// 6. Controller'ları yönlendir
+app.UseAuthorization();
 app.MapControllers();
 
+// Projeyi resmen ayağa kaldırıp dinlemeye başlıyoruz.
 app.Run();
