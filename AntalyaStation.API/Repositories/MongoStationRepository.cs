@@ -30,54 +30,74 @@ namespace AntalyaStation.API.Repositories
             return (data, totalCount);
         }
 
-        // --- YENİ EKLENEN FİLTRELEME MANTIĞI ---
-        public async Task<(List<Station> Data, int TotalCount)> GetFilteredStationsAsync(StationFilterDto filter, int pageNumber, int pageSize)
-        {
-            var builder = Builders<Station>.Filter;
-            var filterDefinition = builder.Empty;
+       public async Task<(List<Station> Data, int TotalCount)> GetFilteredStationsAsync(StationFilterDto filter, int pageNumber, int pageSize)
+{
+    var builder = Builders<Station>.Filter;
+    var filterDefinition = builder.Empty;
 
-            if (!string.IsNullOrWhiteSpace(filter.StationName))
-                filterDefinition &= builder.Regex(s => s.StationName, new BsonRegularExpression(filter.StationName, "i"));
-    
-            if (!string.IsNullOrWhiteSpace(filter.StationNumber))
-                filterDefinition &= builder.Regex(s => s.StationNumber, new BsonRegularExpression(filter.StationNumber, "i"));
-
-            if (!string.IsNullOrWhiteSpace(filter.City)) 
-                filterDefinition &= builder.Eq(s => s.City, filter.City);
+    // 🟢 1. BİRLEŞİK ARAMA (İsim, Numara veya Marka içinde KISMEN geçiyorsa bile getirir)
+    if (!string.IsNullOrWhiteSpace(filter.SearchText))
+    {
+        var searchRegex = new BsonRegularExpression(filter.SearchText, "i"); // "i" = Büyük/Küçük harf duyarsız
         
-            if (!string.IsNullOrWhiteSpace(filter.District)) 
-                filterDefinition &= builder.Eq(s => s.District, filter.District);
+        var nameFilter = builder.Regex(s => s.StationName, searchRegex);
+        var numberFilter = builder.Regex(s => s.StationNumber, searchRegex);
+        var brandFilter = builder.Regex(s => s.Brand, searchRegex); // Markayı da genel aramaya dahil ettik
 
-            if (!string.IsNullOrWhiteSpace(filter.OperatorName)) 
-                filterDefinition &= builder.Regex(s => s.OperatorName, new BsonRegularExpression(filter.OperatorName, "i"));
+        filterDefinition &= builder.Or(nameFilter, numberFilter, brandFilter);
+    }
 
-            if (!string.IsNullOrWhiteSpace(filter.Brand)) 
-                filterDefinition &= builder.Regex(s => s.Brand, new BsonRegularExpression(filter.Brand, "i"));
+    // 🟢 2. MARKA FİLTRESİ (Gelişmiş - Kısmi arama toleranslı)
+    if (!string.IsNullOrWhiteSpace(filter.Brand))
+    {
+        filterDefinition &= builder.Regex(s => s.Brand, new BsonRegularExpression(filter.Brand, "i"));
+    }
 
-            if (!string.IsNullOrWhiteSpace(filter.ServiceType)) 
-                filterDefinition &= builder.Eq(s => s.ServiceType, filter.ServiceType);
+    // 🟢 3. ŞARJ AĞI İŞLETMECİSİ (Çalışmama sorunu çözüldü - Kısmi arama toleranslı)
+    if (!string.IsNullOrWhiteSpace(filter.OperatorNetwork))
+    {
+        filterDefinition &= builder.Regex(s => s.OperatorNetwork, new BsonRegularExpression(filter.OperatorNetwork, "i"));
+    }
 
-            if (!string.IsNullOrWhiteSpace(filter.StationType))
-            {
-                // Sockets dizisinin içinde en az bir tane tipi (AC veya DC) eşleşen soket var mı diye bakar
-                filterDefinition &= builder.ElemMatch(s => s.Sockets, 
-                    Builders<Socket>.Filter.Regex(sock => sock.Type, new BsonRegularExpression(filter.StationType, "i")));
-            }
+    // 🟢 4. İL FİLTRESİ
+    if (!string.IsNullOrWhiteSpace(filter.City)) 
+    {
+        filterDefinition &= builder.Regex(s => s.City, new BsonRegularExpression($"^{filter.City}$", "i"));
+    }
+        
+    // 🟢 5. İLÇE FİLTRESİ (Çalışmama sorunu çözüldü - Harf duyarlılığı kaldırıldı)
+    if (!string.IsNullOrWhiteSpace(filter.District)) 
+    {
+        filterDefinition &= builder.Regex(s => s.District, new BsonRegularExpression(filter.District, "i"));
+    }
 
-            if (filter.IsGreenCharging.HasValue) 
-                filterDefinition &= builder.Eq(s => s.IsGreenCharging, filter.IsGreenCharging.Value);
+    if (!string.IsNullOrWhiteSpace(filter.OperatorStation)) 
+        filterDefinition &= builder.Regex(s => s.OperatorStation, new BsonRegularExpression(filter.OperatorStation, "i"));
+
+    if (!string.IsNullOrWhiteSpace(filter.ServiceType)) 
+        filterDefinition &= builder.Regex(s => s.ServiceType, new BsonRegularExpression(filter.ServiceType, "i"));
+
+    if (!string.IsNullOrWhiteSpace(filter.StationType))
+    {
+        filterDefinition &= builder.ElemMatch(s => s.Sockets, 
+            Builders<Socket>.Filter.Regex(sock => sock.Type, new BsonRegularExpression(filter.StationType, "i")));
+    }
+
+    if (filter.IsGreenCharging.HasValue) 
+        filterDefinition &= builder.Eq(s => s.IsGreenCharging, filter.IsGreenCharging.Value);
     
-            if (filter.IsSmartCharging.HasValue) 
-                filterDefinition &= builder.Eq(s => s.IsSmartCharging, filter.IsSmartCharging.Value);
-// Sorguyu çalıştır ve sayfala
-            var totalCount = (int)await _stations.CountDocumentsAsync(filterDefinition);
-            var data = await _stations.Find(filterDefinition)
-                .Skip((pageNumber - 1) * pageSize)
-                .Limit(pageSize)
-                .ToListAsync();
+    if (filter.IsSmartCharging.HasValue) 
+        filterDefinition &= builder.Eq(s => s.IsSmartCharging, filter.IsSmartCharging.Value);
 
-            return (data, totalCount);
-        }
+    // Veriyi çekme ve sayfalama adımları (.NET 10 uyumlu optimizasyonlu)
+    var totalCount = (int)await _stations.CountDocumentsAsync(filterDefinition);
+    var data = await _stations.Find(filterDefinition)
+        .Skip((pageNumber - 1) * pageSize)
+        .Limit(pageSize)
+        .ToListAsync();
+
+    return (data, totalCount);
+}
 
         // Toplu Ekleme
         public async Task InsertManyAsync(List<Station> stations)
@@ -107,6 +127,13 @@ namespace AntalyaStation.API.Repositories
         {
             var result = await _stations.DeleteOneAsync(s => s.Id == id);
             return result.DeletedCount > 0;
+            
+        }
+        
+        public async Task ClearAllStationsAsync()
+        {
+            // Boş bir filtre vererek koleksiyondaki tüm dökümanları sileriz
+            await _stations.DeleteManyAsync(Builders<Station>.Filter.Empty);
         }
     }
 }

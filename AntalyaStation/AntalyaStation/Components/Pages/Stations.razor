@@ -3,180 +3,248 @@
 @using System.Net.Http.Json
 @using System.Threading
 @using System.Text
-@using AntalyaStation.API.DTOs 
+@using AntalyaStation.API.DTOs
 @using BlazorBootstrap
 @inject HttpClient Http
 @inject IJSRuntime JsRuntime
+@using AntalyaStation.API.Models
 
 <div class="container-fluid mt-4">
-    <div class="row g-4">
-        
-        <!-- 1. SOL TARAF: AKILLI, BAĞIMLI VE KOŞULLU FİLTRE PANELİ -->
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0 rounded-3">
-                <div class="card-header bg-light text-primary fw-bold py-3 border-0">
-                    🔍 İstasyon Filtreleri
-                </div>
-                <div class="card-body">
-                    <!-- 🎯 Birleşik Arama Alanı (Ad veya No) -->
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-muted small">İstasyon Adı veya Numarası</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-white"><i class="bi bi-ev-station text-primary"></i></span>
-                            <input type="text" class="form-control" @bind="_filter.SearchText" placeholder="Ara: İstasyon adı veya no...">
-                        </div>
-                    </div>
-                    
-                    <!-- 🎯 İl Seçimi (Tüm İller Dinamik Listelenir) -->
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-muted small">İl</label>
-                        <select class="form-select form-select-sm" value="@_filter.City" @onchange="OnCityChanged">
-                            <option value="Fark Etmez">Fark Etmez</option>
-                            @foreach (var city in _citiesAndDistricts.Keys)
-                            {
-                                <option value="@city">@city</option>
-                            }
-                        </select>
-                    </div>
 
-                    <!-- 🎯 Koşullu İlçe Seçimi (Sadece İl Seçildiğinde Çıkar) -->
+    <!-- 1. ÜST TARAF: GENİŞ FİLTRE PANELİ -->
+    <div class="card shadow-sm border-0 rounded-3 mb-4">
+        <div class="card-header bg-light text-primary fw-bold py-3 border-0">
+            🔍 İstasyon Filtreleri
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Birleşik Arama Alanı -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold text-muted small">İstasyon Adı, No veya Marka</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-ev-station text-primary"></i></span>
+                        <input type="text" class="form-control" @bind="_filter.SearchText" placeholder="Ara: eşar, şarjplus vb...">
+                    </div>
+                </div>
+
+                <!-- İl Seçimi -->
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold text-muted small">İl</label>
+                    <select class="form-select form-select-sm" value="@_filter.City" @onchange="OnCityChanged">
+                        <option value="Fark Etmez">Fark Etmez</option>
+                        @foreach (var city in _citiesAndDistricts.Keys)
+                        {
+                        <option value="@city">@city</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Koşullu İlçe Seçimi -->
+                <div class="col-md-2">
                     @if (_filter.City != "Fark Etmez")
                     {
-                        <div class="mb-3 animate__animated animate__fadeIn">
-                            <label class="form-label fw-semibold text-muted small">İlçe</label>
-                            <select class="form-select form-select-sm" @bind="_filter.District">
-                                <option value="Fark Etmez">Tüm İlçeler (Fark Etmez)</option>
-                                @if (_citiesAndDistricts.ContainsKey(_filter.City))
-                                {
-                                    @foreach (var district in _citiesAndDistricts[_filter.City])
-                                    {
-                                        <option value="@district">@district</option>
-                                    }
-                                }
-                            </select>
-                        </div>
+                    <label class="form-label fw-semibold text-muted small">İlçe</label>
+                    <select class="form-select form-select-sm animate__animated animate__fadeIn" @bind="_filter.District">
+                        <option value="Fark Etmez">Tüm İlçeler (Fark Etmez)</option>
+                        @if (_citiesAndDistricts.ContainsKey(_filter.City))
+                        {
+                        @foreach (var district in _citiesAndDistricts[_filter.City])
+                        {
+                        <option value="@district">@district</option>
+                        }
+                        }
+                    </select>
                     }
+                    else
+                    {
+                    <label class="form-label fw-semibold text-muted small text-black-50">İlçe (Önce İl Seçin)</label>
+                    <select class="form-select form-select-sm" disabled><option>Fark Etmez</option></select>
+                    }
+                </div>
 
-                    <!-- Hizmet Şekli -->
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-muted small">Hizmet Şekli</label>
-                        <select class="form-select form-select-sm" @bind="_filter.ServiceType">
-                            <option value="Fark Etmez">Fark Etmez</option>
-                            <option value="Halka Açık">Halka Açık</option>
-                            <option value="Özel Kullanım">Özel Kullanım</option>
-                        </select>
-                    </div>
+                <!-- Hizmet Şekli -->
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold text-muted small">Hizmet Şekli</label>
+                    <select class="form-select form-select-sm" @bind="_filter.ServiceType">
+                        <option value="Fark Etmez">Fark Etmez</option>
+                        <option value="Halka Açık">Halka Açık</option>
+                        <option value="Özel Kullanım">Özel Kullanım</option>
+                    </select>
+                </div>
 
-                    <!-- 📊 BOOTSTRAP GELİŞMİŞ KRİTERLER AKORDEONU -->
-                    <div class="accordion accordion-flush mb-4" id="advancedFilterAccordion">
-                        <div class="accordion-item border-0">
-                            <h2 class="accordion-header" id="flush-headingOne">
-                                <button class="accordion-button collapsed ps-0 py-2 text-primary fw-semibold small" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapseOne">
-                                    ⚙️ Gelişmiş Kriterler
-                                </button>
-                            </h2>
-                            <div id="flush-collapseOne" class="accordion-collapse collapse" data-bs-parent="#advancedFilterAccordion">
-                                <div class="accordion-body px-0 pt-2">
-                                    
-                                    <!-- 🎯 Marka Combo Box (Açılır Kutu) -->
-                                    <div class="mb-3">
-                                        <label class="form-label text-muted small">Marka</label>
-                                        <select class="form-select form-select-sm" @bind="_filter.Brand">
-                                            <option value="">Fark Etmez</option>
-                                            <option value="ZES">ZES</option>
-                                            <option value="Eşarj">Eşarj</option>
-                                            <option value="Voltrun">Voltrun</option>
-                                            <option value="Trugo">Trugo</option>
-                                            <option value="Astor Charge">Astor Charge</option>
-                                            <option value="Tunçmatik">Tunçmatik</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label text-muted small">Şarj Ağı İşletmecisi</label>
-                                        <input type="text" class="form-control form-control-sm" @bind="_filter.OperatorName">
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label text-muted small">Şarj İstasyonu Türü</label>
-                                        <select class="form-select form-select-sm" @bind="_filter.StationType">
-                                            <option value="Fark Etmez">Fark Etmez</option>
-                                            <option value="AC">AC</option>
-                                            <option value="DC">DC</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- 🎯 Yeşil Enerji ve Akıllı Şarj Onaylama Kutuları (Checkbox) -->
-                                    <div class="mb-2 form-check">
+                <!-- Aksiyon Butonları -->
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button class="btn btn-primary btn-sm flex-grow-1 py-2" @onclick="SorguyuCalistir">🔍 Sorguyu Çalıştır</button>
+                    <button class="btn btn-outline-secondary btn-sm py-2" @onclick="ClearFilters">🧹 Temizle</button>
+                </div>
+            </div>
+
+            <!-- GELEŞMİŞ KRİTERLER -->
+            <div class="accordion accordion-flush mt-3" id="advancedFilterAccordion">
+                <div class="accordion-item border-0">
+                    <h2 class="accordion-header" id="flush-headingOne">
+                        <button class="accordion-button collapsed ps-0 py-2 text-primary fw-semibold small" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapseOne">
+                            ⚙️ Gelişmiş Kriterler Ayarları
+                        </button>
+                    </h2>
+                    <div id="flush-collapseOne" class="accordion-collapse collapse" data-bs-parent="#advancedFilterAccordion">
+                        <div class="accordion-body px-0 pt-2">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label text-muted small">Marka</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="_filter.Brand" placeholder="Marka adı...">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-muted small">Şarj Ağı İşletmecisi</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="_filter.OperatorNetwork" placeholder="İşletmeci adı...">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label text-muted small">Şarj İstasyonu Türü</label>
+                                    <select class="form-select form-select-sm" @bind="_filter.StationType">
+                                        <option value="Fark Etmez">Fark Etmez</option>
+                                        <option value="AC">AC</option>
+                                        <option value="DC">DC</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-center gap-3 mt-4">
+                                    <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="greenCheckFilter" @bind="_isGreenChecked">
-                                        <label class="form-check-label text-muted small fw-semibold" for="greenCheckFilter">🌿 Yeşil Enerji Sertifikalı</label>
+                                        <label class="form-check-label text-muted small fw-semibold" for="greenCheckFilter">🌿 Yeşil Enerji</label>
                                     </div>
-                                    
-                                    <div class="mb-3 form-check">
+                                    <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="smartCheckFilter" @bind="_isSmartChecked">
-                                        <label class="form-check-label text-muted small fw-semibold" for="smartCheckFilter">💡 Akıllı Şarj Desteği</label>
+                                        <label class="form-check-label text-muted small fw-semibold" for="smartCheckFilter">💡 Akıllı Şarj</label>
                                     </div>
-                                    
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Aksiyon Butonları -->
-                    <button class="btn btn-primary w-100 mb-2 py-2" @onclick="RefreshGrid">🔍 Sorguyu Çalıştır</button>
-                    <button class="btn btn-outline-secondary w-100 py-2" @onclick="ClearFilters">🧹 Filtreleri Temizle</button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- 2. SAĞ TARAF: DİNAMİK BLAZORBOOTSTRAP DATAGRID -->
-        <div class="col-md-9">
-            <div class="card shadow-sm border-0 rounded-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="text-dark fw-bold m-0">Aktif Şarj İstasyonları Veri Havuzu</h5>
-                        <div class="d-flex gap-2">
-                            <Button Color="ButtonColor.Success" Size="ButtonSize.Small" @onclick="OpenAddModal">➕ Yeni İstasyon</Button>
-                            <Button Color="ButtonColor.Info" Size="ButtonSize.Small" Class="text-white" @onclick="ExportToExcel">📊 Excel Raporu (.xls)</Button>
-                        </div>
+    <!-- 2. ALT TARAF: GENİŞ TABLO ALANI -->
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="text-dark fw-bold m-0">Aktif Şarj İstasyonları Veri Havuzu</h5>
+                <div class="d-flex gap-2 align-items-center">
+
+                    <!-- SAYFA BOYUTU AYARLAYICI -->
+                    <div class="d-flex align-items-center gap-1 me-2 bg-light p-1 rounded border">
+                        <label class="small text-muted fw-bold m-0 text-nowrap px-1">Kayıt Göster:</label>
+                        <select class="form-select form-select-sm border-0 bg-transparent fw-bold text-primary" style="width: 75px; shadow: none;" value="@_pageSize" @onchange="OnPageSizeChanged">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
                     </div>
 
-                    <Grid @ref="grid" TItem="StationDto" DataProvider="StationsDataProvider" AllowPaging="true" PageSize="10" Class="table table-hover table-bordered text-center align-middle" Responsive="true">
-                        <GridColumns>
-                            <GridColumn TItem="StationDto" HeaderText="İstasyon No" PropertyName="StationNumber">@context.StationNumber</GridColumn>
-                            <GridColumn TItem="StationDto" HeaderText="İstasyon Adı" PropertyName="StationName" Class="fw-bold text-start">@context.StationName</GridColumn>
-                            <GridColumn TItem="StationDto" HeaderText="Marka" PropertyName="Brand">@context.Brand</GridColumn>
-                            <GridColumn TItem="StationDto" HeaderText="İl/İlçe">@context.City / @context.District</GridColumn>
-                            <GridColumn TItem="StationDto" HeaderText="Hizmet Şekli">
-                                <span class="badge @(context.ServiceType == "Halka Açık" ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning") px-2.5 py-1.5 rounded-pill">
-                                    @context.ServiceType
-                                </span>
-                            </GridColumn>
-                            <GridColumn TItem="StationDto" HeaderText="Soket" Filterable="false">
-                                <span class="badge bg-primary px-2 py-1 rounded-circle">@(context.Sockets?.Count ?? context.TotalSockets)</span>
-                            </GridColumn>
-                            <GridColumn TItem="StationDto" HeaderText="Özellikler">
-                                <div class="d-flex gap-1 justify-content-center">
-                                    @if (context.IsGreenCharging) { <span class="badge bg-success" title="Yeşil Şarj">🌿 Yeşil</span> }
-                                    @if (context.IsSmartCharging) { <span class="badge bg-info text-white" title="Akıllı Şarj">💡 Akıllı</span> }
-                                </div>
-                            </GridColumn>
-                            <GridColumn TItem="StationDto" HeaderText="Eylemler" Filterable="false" Sortable="false">
-                                <div class="d-flex gap-1 justify-content-center">
-                                    <Button Color="ButtonColor.Warning" Size="ButtonSize.Small" @onclick="() => OpenEditModal(context)">✏️</Button>
-                                    <Button Color="ButtonColor.Danger" Size="ButtonSize.Small" @onclick="() => DeleteStation(context)">🗑️</Button>
-                                </div>
-                            </GridColumn>
-                        </GridColumns>
-                    </Grid>
+                    <Button Color="ButtonColor.Success" Size="ButtonSize.Small" @onclick="OpenAddModal">➕ Yeni İstasyon</Button>
+                    <Button Color="ButtonColor.Info" Size="ButtonSize.Small" Class="text-white" @onclick="ExportToExcel">📊 Excel Raporu (.xls)</Button>
                 </div>
             </div>
-        </div>
 
+            <Grid @ref="grid" TItem="StationDto" DataProvider="StationsDataProvider" AllowPaging="true" PageSize="@_pageSize" Class="table table-hover table-bordered text-center align-middle" Responsive="true">
+                <GridColumns>
+                    <GridColumn TItem="StationDto" HeaderText="İstasyon No" PropertyName="StationNumber">@context.StationNumber</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="İstasyon Adı" PropertyName="StationName" Class="fw-bold text-start">@context.StationName</GridColumn>
+
+                    <!-- 🎯 HİZMET ŞEKLİ METİN GÖRÜNÜMÜ -->
+                    <GridColumn TItem="StationDto" HeaderText="Hizmet Şekli" PropertyName="ServiceType">
+                        @{
+                        var serviceValue = context.ServiceType?.ToUpper() ?? "";
+                        if (serviceValue.Contains("HALKA") || serviceValue.Contains("ACIK") || serviceValue.Contains("AÇIK"))
+                        {
+                        <span class="fw-semibold text-success">Halka Açık</span>
+                        }
+                        else if (serviceValue.Contains("OZEL") || serviceValue.Contains("ÖZEL") || serviceValue.Contains("KULLANIM"))
+                        {
+                        <span class="fw-semibold text-warning">Özel Kullanım</span>
+                        }
+                        else
+                        {
+                        <span class="text-muted">@context.ServiceType</span>
+                        }
+                        }
+                    </GridColumn>
+
+                    <GridColumn TItem="StationDto" HeaderText="Marka">@context.Brand</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Şarj Ağı İşletmecisi">@context.OperatorNetwork</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Şarj İstasyonu İşletmecisi">@context.OperatorStation</GridColumn>
+
+                    <!-- 🎯 SOKET SAYISI VE BİLGİLERİ (Tek Kutuda Birleştirildi) -->
+                    <GridColumn TItem="StationDto" HeaderText="Soket Detayı">
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <span class="badge bg-primary rounded-pill px-2 py-1">@context.TotalSockets Adet</span>
+                            <Button Color="ButtonColor.Info" Size="ButtonSize.Small" Class="text-white px-2 py-1" @onclick="() => OpenSocketDetails(context)">🔍 Gör</Button>
+                        </div>
+                    </GridColumn>
+
+                    <GridColumn TItem="StationDto" HeaderText="Adres" Class="text-start">@context.Address</GridColumn>
+
+                    <!-- Yönetim Eylemleri -->
+                    <GridColumn TItem="StationDto" HeaderText="Eylemler" Filterable="false" Sortable="false">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <Button Color="ButtonColor.Warning" Size="ButtonSize.Small" @onclick="() => OpenEditModal(context)">✏️</Button>
+                            <Button Color="ButtonColor.Danger" Size="ButtonSize.Small" @onclick="() => DeleteStation(context)">🗑️</Button>
+                        </div>
+                    </GridColumn>
+                </GridColumns>
+            </Grid>
+        </div>
     </div>
 </div>
 
-<!-- 🌐 MODAL FORM (EKLEME & DÜZENLEME) -->
+<!-- 🔌 SOKET DETAY MODAL PENCERESİ -->
+<Modal @ref="socketDetailsModal" Title="🔌 Soket Konfigürasyon Detayları" IsVerticallyCentered="true">
+    <BodyTemplate>
+        @if (selectedStationForSockets != null)
+        {
+        <div class="mb-3">
+            <h6 class="fw-bold text-primary">@selectedStationForSockets.StationName</h6>
+            <small class="text-muted">İstasyon No: @selectedStationForSockets.StationNumber</small>
+        </div>
+
+        <table class="table table-sm table-striped table-bordered text-center align-middle">
+            <thead class="table-dark">
+            <tr>
+                <th>Soket No</th>
+                <th>Soket Tipi</th>
+                <th>Soket Gücü (kW)</th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (selectedStationForSockets.Sockets != null && selectedStationForSockets.Sockets.Any())
+            {
+            @foreach (var socket in selectedStationForSockets.Sockets)
+            {
+            <tr>
+                <td class="fw-bold">@socket.SocketNumber</td>
+                <td><span class="badge bg-secondary">@socket.Type</span></td>
+                <td class="text-success fw-bold">@socket.Power kW</td>
+            </tr>
+            }
+            }
+            else
+            {
+            <tr>
+                <td colspan="3" class="text-muted py-3">Bu istasyona ait kayıtlı soket bilgisi bulunamadı.</td>
+            </tr>
+            }
+            </tbody>
+        </table>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <Button Color="ButtonColor.Secondary" @onclick="CloseSocketModal">Kapat</Button>
+        </div>
+        }
+    </BodyTemplate>
+</Modal>
+
+<!-- 🌐 GENEL MODAL FORM (EKLEME & DÜZENLEME) -->
 <Modal @ref="stationModal" Title="@modalTitle" IsVerticallyCentered="true" Size="ModalSize.Large">
     <BodyTemplate>
         <EditForm Model="currentStation" OnValidSubmit="SaveStation">
@@ -185,11 +253,12 @@
                 <div class="col-md-6"><label class="form-label fw-semibold text-muted small">İstasyon Adı</label><input type="text" @bind="currentStation.StationName" class="form-control" required /></div>
                 <div class="col-md-6"><label class="form-label fw-semibold text-muted small">Marka</label><input type="text" @bind="currentStation.Brand" class="form-control" /></div>
                 <div class="col-md-6"><label class="form-label fw-semibold text-muted small">Hizmet Şekli</label><input type="text" @bind="currentStation.ServiceType" class="form-control" /></div>
-                <div class="col-md-6"><label class="form-label fw-semibold text-muted small">Şarj Ağı İşletmecisi</label><input type="text" @bind="currentStation.OperatorName" class="form-control" /></div>
+                <div class="col-md-6"><label class="form-label fw-semibold text-muted small">Şarj Ağı İşletmecisi</label><input type="text" @bind="currentStation.OperatorNetwork" class="form-control" /></div>
+                <div class="col-md-6"><label class="form-label fw-semibold text-muted small">Şarj İstasyonu İşletmecisi</label><input type="text" @bind="currentStation.OperatorStation" class="form-control" /></div>
                 <div class="col-md-3"><label class="form-label fw-semibold text-muted small">İl</label><input type="text" @bind="currentStation.City" class="form-control" required /></div>
                 <div class="col-md-3"><label class="form-label fw-semibold text-muted small">İlçe</label><input type="text" @bind="currentStation.District" class="form-control" required /></div>
                 <div class="col-md-12"><label class="form-label fw-semibold text-muted small">Adres</label><input type="text" @bind="currentStation.Address" class="form-control" /></div>
-                
+
                 <div class="col-md-6 mt-4">
                     <div class="form-check form-switch">
                         <input type="checkbox" @bind="currentStation.IsGreenCharging" class="form-check-input" id="greenCheck" />
@@ -203,7 +272,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="mt-4 border p-3 rounded bg-light">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="m-0 text-secondary fw-bold">🔌 Soket Konfigürasyonu (@(currentStation.Sockets?.Count ?? 0) Adet)</h6>
@@ -211,20 +280,20 @@
                 </div>
                 @if (currentStation.Sockets != null)
                 {
-                    @foreach (var socket in currentStation.Sockets)
-                    {
-                        <div class="row g-2 mb-2 align-items-center">
-                            <div class="col-3"><input type="text" placeholder="Soket No" @bind="socket.SocketNumber" class="form-control form-control-sm" /></div>
-                            <div class="col-3"><input type="text" placeholder="Tip (AC/DC)" @bind="socket.Type" class="form-control form-control-sm" /></div>
-                            <div class="col-4"><input type="text" placeholder="Güç (kW)" @bind="socket.Power" class="form-control form-control-sm" /></div>
-                            <div class="col-2 text-center">
-                                <button type="button" class="btn btn-sm btn-danger" @onclick="() => currentStation.Sockets.Remove(socket)">❌</button>
-                            </div>
-                        </div>
-                    }
+                @foreach (var socket in currentStation.Sockets)
+                {
+                <div class="row g-2 mb-2 align-items-center">
+                    <div class="col-3"><input type="text" placeholder="Soket No" @bind="socket.SocketNumber" class="form-control form-control-sm" /></div>
+                    <div class="col-3"><input type="text" placeholder="Tip (AC/DC)" @bind="socket.Type" class="form-control form-control-sm" /></div>
+                    <div class="col-4"><input type="text" placeholder="Güç (kW)" @bind="socket.Power" class="form-control form-control-sm" /></div>
+                    <div class="col-2 text-center">
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => currentStation.Sockets.Remove(socket)">❌</button>
+                    </div>
+                </div>
+                }
                 }
             </div>
-            
+
             <div class="d-flex justify-content-end gap-2 mt-4">
                 <Button Color="ButtonColor.Secondary" @onclick="CloseModal">İptal</Button>
                 <button type="submit" class="btn btn-primary px-4">💾 Kaydet</button>
@@ -234,201 +303,230 @@
 </Modal>
 
 @code {
-    private Grid<StationDto> grid;
-    private StationLocalFilter _filter = new(); 
-    
-    private Modal stationModal;
-    private StationDto currentStation = new() { Sockets = new List<SocketDto>() };
-    private List<StationDto> allCurrentData = new(); 
-    private bool isEditMode = false;
-    private string modalTitle = "Yeni İstasyon Ekle";
-    private string apiBaseUrl = "http://localhost:5079"; 
+private Grid<StationDto> grid;
+private StationLocalFilter _filter = new();
 
-    // Onay Kutusu (Checkbox) durum yardımcıları
-    private bool _isGreenChecked = false;
-    private bool _isSmartChecked = false;
+private Modal stationModal;
+private Modal socketDetailsModal;
 
-    // 🎯 TÜM İLLER VE İLÇELERİ (İstediğin kadar ili buraya ekleyebilirsin, sistem otomatik eşleşir)
-    private Dictionary<string, List<string>> _citiesAndDistricts = new()
-    {
-        { "ANTALYA", new() { "Muratpaşa", "Kepez", "Konyaaltı", "Alanya", "Manavgat", "Serik", "Kumluca", "Döşemealtı" } },
-        { "İSTANBUL", new() { "Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Fatih", "Esenyurt", "Pendik", "Ümraniye" } },
-        { "ANKARA", new() { "Çankaya", "Keçiören", "Yenimahalle", "Mamak", "Etimesgut", "Sincan", "Altındağ" } },
-        { "İZMİR", new() { "Konak", "Karşıyaka", "Bornova", "Buca", "Çiğli", "Gaziemir", "Balçova" } },
-        { "BURSA", new() { "Osmangazi", "Nilüfer", "Yıldırım", "İnegöl", "Gemlik", "Mudanya" } },
-        { "ADANA", new() { "Seyhan", "Çukurova", "Yüreğir", "Sarıçam", "Ceyhan" } }
-    };
+private StationDto currentStation = new() { Sockets = new List<SocketDto>() };
+private StationDto? selectedStationForSockets = null;
+private List<StationDto> allCurrentData = new();
 
-    // 🎯 İl değiştiğinde çalışan mimari (İlçe görünürlüğünü tetikler)
-    private void OnCityChanged(ChangeEventArgs e)
-    {
-        _filter.City = e.Value?.ToString() ?? "Fark Etmez";
-        _filter.District = "Fark Etmez"; 
-    }
+private bool isEditMode = false;
+private bool _hasSearched = false;
+private int _pageSize = 10;
 
-    private async Task<GridDataProviderResult<StationDto>> StationsDataProvider(GridDataProviderRequest<StationDto> request)
-    {
-        try
-        {
-            // 🎯 Checkbox mantığı: İşaretliyse true gönder, değilse null (yani tümünü getir)
-            _filter.IsGreenCharging = _isGreenChecked ? true : null;
-            _filter.IsSmartCharging = _isSmartChecked ? true : null;
+private string modalTitle = "Yeni İstasyon Ekle";
+private string apiBaseUrl = "http://localhost:5079";
 
-            string cityParam = _filter.City == "Fark Etmez" ? "" : _filter.City;
-            string districtParam = _filter.District == "Fark Etmez" ? "" : _filter.District;
-            string serviceParam = _filter.ServiceType == "Fark Etmez" ? "" : _filter.ServiceType;
-            string typeParam = _filter.StationType == "Fark Etmez" ? "" : _filter.StationType;
+private bool _isGreenChecked = false;
+private bool _isSmartChecked = false;
 
-            // 🎯 URL parametrelerine yenilenen `SearchText` birleşik arama alanını besliyoruz
-            var url = $"{apiBaseUrl}/api/stations?pageNumber={request.PageNumber}&pageSize={request.PageSize}" +
-                      $"&searchText={Uri.EscapeDataString(_filter.SearchText ?? "")}" +
-                      $"&city={Uri.EscapeDataString(cityParam)}" +
-                      $"&district={Uri.EscapeDataString(districtParam)}" +
-                      $"&serviceType={Uri.EscapeDataString(serviceParam)}" +
-                      $"&brand={Uri.EscapeDataString(_filter.Brand ?? "")}" +
-                      $"&operatorName={Uri.EscapeDataString(_filter.OperatorName ?? "")}" +
-                      $"&stationType={Uri.EscapeDataString(typeParam)}" +
-                      $"&isGreenCharging={_filter.IsGreenCharging}" +
-                      $"&isSmartCharging={_filter.IsSmartCharging}";
+private Dictionary<string, List<string>> _citiesAndDistricts = new()
+{
+{ "ANTALYA", new() { "Muratpaşa", "Kepez", "Konyaaltı", "Alanya", "Manavgat", "Serik", "Kumluca", "Döşemealtı" } },
+{ "İSTANBUL", new() { "Kadıköy", "Beşiktaş", "Üsküdar", "Şişli", "Fatih", "Esenyurt", "Pendik", "Ümraniye" } },
+{ "ANKARA", new() { "Çankaya", "Keçiören", "Yenimahalle", "Mamak", "Etimesgut", "Sincan", "Altındağ" } },
+{ "İZMİR", new() { "Konak", "Karşıyaka", "Bornova", "Buca", "Çiğli", "Gaziemir", "Balçova" } }
+};
 
-            var response = await Http.GetFromJsonAsync<PagedResult<StationDto>>(url);
-            if (response != null && response.Data != null)
-            {
-                allCurrentData = response.Data; 
-                return new GridDataProviderResult<StationDto> { Data = response.Data, TotalCount = response.TotalCount };
-            }
-        }
-        catch (Exception ex) { Console.WriteLine($"API yükleme hatası: {ex.Message}"); }
-        return new GridDataProviderResult<StationDto> { Data = new List<StationDto>(), TotalCount = 0 };
-    }
+private async Task OnPageSizeChanged(ChangeEventArgs e)
+{
+if (int.TryParse(e.Value?.ToString(), out int newSize))
+{
+_pageSize = newSize;
+if (grid != null) await grid.RefreshDataAsync();
+}
+}
 
-    private void AddSocketRow()
-    {
-        if (currentStation.Sockets == null) currentStation.Sockets = new List<SocketDto>();
-        currentStation.Sockets.Add(new SocketDto());
-    }
+private void OnCityChanged(ChangeEventArgs e)
+{
+_filter.City = e.Value?.ToString() ?? "Fark Etmez";
+_filter.District = "Fark Etmez";
+}
 
-    private async Task OpenAddModal()
-    {
-        isEditMode = false;
-        modalTitle = "➕ Yeni İstasyon Ekle";
-        currentStation = new StationDto { Sockets = new List<SocketDto>(), City = "ANTALYA" }; 
-        await stationModal.ShowAsync();
-    }
+private async Task SorguyuCalistir()
+{
+_hasSearched = true;
+if (grid != null) await grid.RefreshDataAsync();
+}
 
-    private async Task OpenEditModal(StationDto station)
-    {
-        isEditMode = true;
-        modalTitle = "✏️ İstasyon Düzenle";
-        currentStation = new StationDto
-        {
-            Id = station.Id,
-            StationNumber = station.StationNumber,
-            StationName = station.StationName,
-            Brand = station.Brand,
-            OperatorName = station.OperatorName,
-            ServiceType = station.ServiceType,
-            Address = station.Address,
-            City = station.City,
-            District = station.District,
-            TotalSockets = station.TotalSockets,
-            IsGreenCharging = station.IsGreenCharging,
-            IsSmartCharging = station.IsSmartCharging,
-            Sockets = station.Sockets != null ? new List<SocketDto>(station.Sockets) : new List<SocketDto>()
-        };
-        await stationModal.ShowAsync();
-    }
+private async Task<GridDataProviderResult<StationDto>> StationsDataProvider(GridDataProviderRequest<StationDto> request)
+{
+if (!_hasSearched) return new GridDataProviderResult<StationDto> { Data = new List<StationDto>(), TotalCount = 0 };
 
-    private async Task CloseModal() => await stationModal.HideAsync();
+try
+{
+_filter.IsGreenCharging = _isGreenChecked ? true : null;
+_filter.IsSmartCharging = _isSmartChecked ? true : null;
 
-    private async Task SaveStation()
-    {
-        try
-        {
-            HttpResponseMessage response;
-            currentStation.TotalSockets = currentStation.Sockets?.Count ?? 0;
+string cityParam = _filter.City == "Fark Etmez" ? "" : _filter.City;
+string districtParam = _filter.District == "Fark Etmez" ? "" : _filter.District;
+string serviceParam = _filter.ServiceType == "Fark Etmez" ? "" : _filter.ServiceType;
+string typeParam = _filter.StationType == "Fark Etmez" ? "" : _filter.StationType;
 
-            if (isEditMode)
-                response = await Http.PutAsJsonAsync($"{apiBaseUrl}/api/stations/{currentStation.Id}", currentStation);
-            else
-                response = await Http.PostAsJsonAsync($"{apiBaseUrl}/api/stations", currentStation);
+var url = $"{apiBaseUrl}/api/stations?pageNumber={request.PageNumber}&pageSize={request.PageSize}" +
+$"&searchText={Uri.EscapeDataString(_filter.SearchText ?? "")}" +
+$"&city={Uri.EscapeDataString(cityParam)}" +
+$"&district={Uri.EscapeDataString(districtParam)}" +
+$"&serviceType={Uri.EscapeDataString(serviceParam)}" +
+$"&brand={Uri.EscapeDataString(_filter.Brand ?? "")}" +
+$"&operatorNetwork={Uri.EscapeDataString(_filter.OperatorNetwork ?? "")}" +
+$"&stationType={Uri.EscapeDataString(typeParam)}" +
+$"&isGreenCharging={_filter.IsGreenCharging}" +
+$"&isSmartCharging={_filter.IsSmartCharging}";
 
-            if (response.IsSuccessStatusCode)
-            {
-                await stationModal.HideAsync();
-                await RefreshGrid(); 
-            }
-        }
-        catch (Exception ex) { Console.WriteLine($"Kaydetme hatası: {ex.Message}"); }
-    }
+var response = await Http.GetFromJsonAsync<PagedResult<StationDto>>(url);
+if (response != null && response.Data != null)
+{
+allCurrentData = response.Data;
+return new GridDataProviderResult<StationDto> { Data = response.Data, TotalCount = response.TotalCount };
+}
+}
+catch (Exception ex) { Console.WriteLine($"API yükleme hatası: {ex.Message}"); }
+return new GridDataProviderResult<StationDto> { Data = new List<StationDto>(), TotalCount = 0 };
+}
 
-    private async Task DeleteStation(StationDto station)
-    {
-        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"{station.StationName} istasyonunu silmek istediğinize emin misiniz?");
-        if (confirmed)
-        {
-            var response = await Http.DeleteAsync($"{apiBaseUrl}/api/stations/{station.Id}");
-            if (response.IsSuccessStatusCode) await RefreshGrid();
-        }
-    }
+private async Task OpenSocketDetails(StationDto station)
+{
+selectedStationForSockets = station;
+await socketDetailsModal.ShowAsync();
+}
 
-    private void ClearFilters()
-    {
-        _filter = new StationLocalFilter();
-        _isGreenChecked = false;
-        _isSmartChecked = false;
-        RefreshGrid();
-    }
+private async Task CloseSocketModal() => await socketDetailsModal.HideAsync();
 
-    private async Task RefreshGrid() { if (grid != null) await grid.RefreshDataAsync(); }
+private void AddSocketRow()
+{
+if (currentStation.Sockets == null) currentStation.Sockets = new List<SocketDto>();
+currentStation.Sockets.Add(new SocketDto());
+}
 
-    private async Task ExportToExcel()
-    {
-        var sb = new StringBuilder();
-        sb.Append("<table border='1'><tr style='background-color:#FFFFCC; font-weight:bold;'>");
-        sb.Append("<th>Sıra No</th><th>İstasyon No</th><th>İstasyon Adı</th><th>Hizmet Şekli</th><th>Marka</th><th>Şarj Ağı İşletmecisi</th><th>İl / İlçe</th><th>Adres</th>");
-        sb.Append("<th style='background-color:#00FFFF;'>Soket No</th><th style='background-color:#00FFFF;'>Soket Tipi</th><th style='background-color:#00FFFF;'>Soket Gücü (kW)</th></tr>");
+private async Task OpenAddModal()
+{
+isEditMode = false;
+modalTitle = "➕ Yeni İstasyon Ekle";
+currentStation = new StationDto { Sockets = new List<SocketDto>(), City = "ANTALYA" };
+await stationModal.ShowAsync();
+}
 
-        int siraNo = 1;
-        foreach (var item in allCurrentData)
-        {
-            int socketCount = item.Sockets?.Count ?? 0;
-            if (socketCount == 0)
-            {
-                sb.Append($"<tr><td>{siraNo++}</td><td>{item.StationNumber}</td><td>{item.StationName}</td><td>{item.ServiceType}</td><td>{item.Brand}</td><td>{item.OperatorName}</td><td>{item.City} / {item.District}</td><td>{item.Address}</td><td>-</td><td>-</td><td>-</td></tr>");
-            }
-            else
-            {
-                for (int i = 0; i < socketCount; i++)
-                {
-                    var sock = item.Sockets[i];
-                    if (i == 0)
-                        sb.Append($"<tr><td rowspan='{socketCount}'>{siraNo++}</td><td rowspan='{socketCount}'>{item.StationNumber}</td><td rowspan='{socketCount}'>{item.StationName}</td><td rowspan='{socketCount}'>{item.ServiceType}</td><td rowspan='{socketCount}'>{item.Brand}</td><td rowspan='{socketCount}'>{item.OperatorName}</td><td rowspan='{socketCount}'>{item.City} / {item.District}</td><td rowspan='{socketCount}'>{item.Address}</td>");
-                    else
-                        sb.Append("<tr>");
-                    
-                    sb.Append($"<td>{sock.SocketNumber}</td><td>{sock.Type}</td><td>{sock.Power}</td></tr>");
-                }
-            }
-        }
-        sb.Append("</table>");
+private async Task OpenEditModal(StationDto station)
+{
+isEditMode = true;
+modalTitle = "✏️ İstasyon Düzenle";
+currentStation = new StationDto
+{
+Id = station.Id,
+StationNumber = station.StationNumber,
+StationName = station.StationName,
+Brand = station.Brand,
+OperatorNetwork  = station.OperatorNetwork,
+OperatorStation = station.OperatorStation,
+ServiceType = station.ServiceType,
+Address = station.Address,
+City = station.City,
+District = station.District,
+TotalSockets = station.TotalSockets,
+IsGreenCharging = station.IsGreenCharging,
+IsSmartCharging = station.IsSmartCharging,
+Sockets = station.Sockets != null ? new List<SocketDto>(station.Sockets) : new List<SocketDto>()
+};
+await stationModal.ShowAsync();
+}
 
-        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-        await JsRuntime.InvokeVoidAsync("BlazorDownloadFile", "EPDK_Istasyon_Raporu.xls", "application/vnd.ms-excel", bytes);
-    }
+private async Task CloseModal() => await stationModal.HideAsync();
 
-    public class StationLocalFilter 
-    { 
-        public string? SearchText { get; set; }
-        public string City { get; set; } = "Fark Etmez";
-        public string District { get; set; } = "Fark Etmez";
-        public string? OperatorName { get; set; }
-        public string? Brand { get; set; }
-        public string ServiceType { get; set; } = "Fark Etmez";
-        public string StationType { get; set; } = "Fark Etmez";
-        public bool? IsGreenCharging { get; set; }
-        public bool? IsSmartCharging { get; set; }
-    }
+private async Task SaveStation()
+{
+try
+{
+HttpResponseMessage response;
+currentStation.TotalSockets = currentStation.Sockets?.Count ?? 0;
 
-    public class PagedResult<T> { public List<T> Data { get; set; } = new(); public int TotalCount { get; set; } }
+if (isEditMode)
+response = await Http.PutAsJsonAsync($"{apiBaseUrl}/api/stations/{currentStation.Id}", currentStation);
+else
+response = await Http.PostAsJsonAsync($"{apiBaseUrl}/api/stations", currentStation);
+
+if (response.IsSuccessStatusCode)
+{
+await stationModal.HideAsync();
+await SorguyuCalistir();
+}
+}
+catch (Exception ex) { Console.WriteLine($"Kaydetme hatası: {ex.Message}"); }
+}
+
+private async Task DeleteStation(StationDto station)
+{
+bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"{station.StationName} istasyonunu silmek istediğinize emin misiniz?");
+if (confirmed)
+{
+var response = await Http.DeleteAsync($"{apiBaseUrl}/api/stations/{station.Id}");
+if (response.IsSuccessStatusCode) await SorguyuCalistir();
+}
+}
+
+private async Task ClearFilters()
+{
+_filter = new StationLocalFilter();
+_isGreenChecked = false;
+_isSmartChecked = false;
+_hasSearched = false;
+if (grid != null) await grid.RefreshDataAsync();
+}
+
+private async Task ExportToExcel()
+{
+var sb = new StringBuilder();
+sb.Append("<table border='1'><tr style='background-color:#FFFFCC; font-weight:bold;'>");
+sb.Append("<th>Sıra No</th><th>İstasyon No</th><th>İstasyon Adı</th><th>Hizmet Şekli</th><th>Marka</th><th>Şarj Ağı İşletmecisi</th><th>Şarj İstasyonu İşletmecisi</th><th>Adres</th>");
+sb.Append("<th style='background-color:#00FFFF;'>Soket No</th><th style='background-color:#00FFFF;'>Soket Tipi</th><th style='background-color:#00FFFF;'>Soket Gücü (kW)</th></tr>");
+
+int siraNo = 1;
+foreach (var item in allCurrentData)
+{
+int socketCount = item.Sockets?.Count ?? 0;
+if (socketCount == 0)
+{
+sb.Append($"<tr><td>{siraNo++}</td><td>{item.StationNumber}</td><td>{item.StationName}</td><td>{item.ServiceType}</td><td>{item.Brand}</td><td>{item.OperatorNetwork}</td><td>{item.OperatorStation}</td><td>{item.Address}</td><td>-</td><td>-</td><td>-</td></tr>");
+}
+else
+{
+for (int i = 0; i < socketCount; i++)
+{
+var sock = item.Sockets[i];
+if (i == 0)
+sb.Append($"<tr><td rowspan='{socketCount}'>{siraNo++}</td><td rowspan='{socketCount}'>{item.StationNumber}</td><td rowspan='{socketCount}'>{item.StationName}</td><td rowspan='{socketCount}'>{item.ServiceType}</td><td rowspan='{socketCount}'>{item.Brand}</td><td rowspan='{socketCount}'>{item.OperatorNetwork}</td><td rowspan='{socketCount}'>{item.OperatorStation}</td><td rowspan='{socketCount}'>{item.Address}</td>");
+else
+sb.Append("<tr>");
+
+sb.Append($"<td>{sock.SocketNumber}</td><td>{sock.Type}</td><td>{sock.Power}</td></tr>");
+}
+}
+}
+sb.Append("</table>");
+
+var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+await JsRuntime.InvokeVoidAsync("BlazorDownloadFile", "EPDK_Istasyon_Raporu.xls", "application/vnd.ms-excel", bytes);
+}
+
+public class StationLocalFilter
+{
+public string? SearchText { get; set; }
+public string City { get; set; } = "Fark Etmez";
+public string District { get; set; } = "Fark Etmez";
+public string? OperatorNetwork { get; set; }
+public string? Brand { get; set; }
+public string ServiceType { get; set; } = "Fark Etmez";
+public string StationType { get; set; } = "Fark Etmez";
+public bool? IsGreenCharging { get; set; }
+public bool? IsSmartCharging { get; set; }
+}
+
+public class PagedResult<T>
+{
+public List<T> Data { get; set; } = new();
+public int TotalCount { get; set; }
+}
 }

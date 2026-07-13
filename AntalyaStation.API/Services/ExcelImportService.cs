@@ -29,8 +29,11 @@ public class ExcelImportService : IExcelImportService
             // Sütun indeksleri görseline göre ayarlandı:
             var stationNo = worksheet.Cells[row, 2].Value?.ToString()?.Trim();     // B Sütunu
             var stationName = worksheet.Cells[row, 3].Value?.ToString()?.Trim();   // C Sütunu
+            var serviceType = worksheet.Cells[row, 4].Value?.ToString()?.Trim();   // D Sütunu
             var brandName = worksheet.Cells[row, 5].Value?.ToString()?.Trim();     // E Sütunu
-            var address = worksheet.Cells[row, 8].Value?.ToString()?.Trim();       // H Sütunu
+            var operatorNetwork = worksheet.Cells[row, 6].Value?.ToString()?.Trim(); //F
+            var operatorStation = worksheet.Cells[row, 7].Value?.ToString()?.Trim(); //G
+            var address = worksheet.Cells[row, 9].Value?.ToString()?.Trim();       // I Sütunu
 
             // Soket Bilgileri
             var socketNo = worksheet.Cells[row, 10].Value?.ToString()?.Trim();     // J Sütunu
@@ -56,18 +59,23 @@ public class ExcelImportService : IExcelImportService
                     StationNumber = stationNo,
                     StationName = stationName ?? "Bilinmeyen İstasyon",
                     Brand = brandName ?? "Bilinmeyen Marka",
-                    Address = address ?? "Adres Belirtilmemiş",
+                    Address = address ?? "Adres Belirtilmemiş", // 🎯 Adres ataması
                     City = city,
                     District = district,
-                    IsGreenCharging = false, // Excel'de özel bir "Yeşil Şarj" sütunu görmediğim için false bıraktım
+                    IsGreenCharging = false, 
                     IsSmartCharging = false,
-                    Sockets = new List<Socket>()
+                    Sockets = new List<Socket>(),
+
+                    // 🎯 BURASI ÇOK KRİTİK! Bu 3 satırın olduğundan emin olun:
+                    ServiceType = serviceType ?? "Halka Açık",
+                    OperatorNetwork = operatorNetwork ?? "Belirtilmemiş",
+                    OperatorStation = operatorStation ?? "Belirtilmemiş"
                 };
                 stationList.Add(currentStation);
             }
 
             // 2. Soket ekleme
-            if (currentStation != null && !string.IsNullOrEmpty(socketNo))
+            else if (currentStation != null && !string.IsNullOrEmpty(socketNo))
             {
                 currentStation.Sockets.Add(new Socket
                 {
@@ -76,6 +84,10 @@ public class ExcelImportService : IExcelImportService
                     Power = socketPower ?? "0"
                 });
             }
+        }
+        foreach (var station in stationList)
+        {
+            station.TotalSockets = station.Sockets.Count;
         }
 
         if (stationList.Any())

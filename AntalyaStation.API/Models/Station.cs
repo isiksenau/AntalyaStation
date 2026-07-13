@@ -14,7 +14,8 @@ namespace AntalyaStation.API.Models
         public string StationNumber { get; set; } = string.Empty;
         public string StationName { get; set; } = string.Empty;
         public string Brand { get; set; } = string.Empty;
-        public string OperatorName { get; set; } = string.Empty; 
+        public string OperatorNetwork  { get; set; } = string.Empty; 
+        public string OperatorStation { get; set; } = string.Empty;
         public string ServiceType { get; set; } = string.Empty;  
         public string Address { get; set; } = string.Empty;
         public string City { get; set; } = "ANTALYA";

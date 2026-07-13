@@ -1,8 +1,8 @@
-﻿namespace AntalyaStation.Models // Kendi Namespace'ine göre düzelt
+﻿namespace AntalyaStation.Components.Pages.Models 
 {
     public class PagedResult<T>
     {
-        public List<T> Data { get; set; }
+        public List<T> Data { get; set; } = new();
         public int TotalCount { get; set; }
     }
 }

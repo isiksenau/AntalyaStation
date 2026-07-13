@@ -42,11 +42,11 @@ var app = builder.Build();
 // 4. HTTP REQUEST PIPELINE (MIDDLEWARES)
 // ==========================================
 // Geliştirme ortamındaysak Swagger arayüzünü tarayıcıya açıyoruz.
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+//}
 
 // Güvenlik, HTTPS yönlendirmesi ve Controller haritalama işlemleri.
 app.UseHttpsRedirection();
