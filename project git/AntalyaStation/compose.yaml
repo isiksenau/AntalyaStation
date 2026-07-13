@@ -1,0 +1,19 @@
+﻿services:
+  antalyastation.client:
+    image: antalyastation.client
+    build:
+      context: .
+      dockerfile: AntalyaStation/AntalyaStation.Client/Dockerfile
+
+  antalyastation:
+    image: antalyastation
+    build:
+      context: .
+      dockerfile: AntalyaStation/AntalyaStation/Dockerfile
+
+  antalyastation.api:
+    image: antalyastation.api
+    build:
+      context: .
+      dockerfile: AntalyaStation.API/Dockerfile
+

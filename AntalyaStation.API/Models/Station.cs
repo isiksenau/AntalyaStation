@@ -1,18 +1,37 @@
-﻿namespace AntalyaStation.API.Models;
-
+﻿using System.Collections.Generic;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-public class Station
+namespace AntalyaStation.API.Models
 {
-    [BsonId] //// Bu alanın MongoDB'deki benzersiz anahtar (_id) olduğunu söyler.
-    [BsonRepresentation(BsonType.ObjectId)] //// Mongo'daki özel ID tipini C# string tipine çevirir.
-    public string? Id { get; set; } // MongoDB'nin kendi ID'si
-    public string StationNumber { get; set; } // İstasyon No
-    public string StationName { get; set; }
-    public string Brand { get; set; }
-    public string Address { get; set; }
-    
-    // Bir istasyonda birden fazla soket olabilir
-    public List<Socket> Sockets { get; set; } = new();
+    [BsonIgnoreExtraElements]
+    public class Station
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? Id { get; set; }
+        
+        public string StationNumber { get; set; } = string.Empty;
+        public string StationName { get; set; } = string.Empty;
+        public string Brand { get; set; } = string.Empty;
+        public string OperatorName { get; set; } = string.Empty; 
+        public string ServiceType { get; set; } = string.Empty;  
+        public string Address { get; set; } = string.Empty;
+        public string City { get; set; } = "ANTALYA";
+        public string District { get; set; } = string.Empty;
+        
+        public int TotalSockets { get; set; }
+        
+        public bool IsGreenCharging { get; set; }
+        public bool IsSmartCharging { get; set; }
+
+        public List<Socket> Sockets { get; set; } = new();
+    }
+
+    public class Socket
+    {
+        public string SocketNumber { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty; // AC/DC
+        public string Power { get; set; } = string.Empty; // kW
+    }
 }

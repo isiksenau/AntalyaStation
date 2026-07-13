@@ -6,7 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <base href="/"/>
     <ResourcePreloader/>
+    
+    <!-- Bootstrap CSS (Senin mevcut yapın) -->
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]"/>
+    
+    <!-- Blazor Bootstrap için gerekli eklemeler -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <link href="_content/Blazor.Bootstrap/blazor.bootstrap.css" rel="stylesheet" />
+    
     <link rel="stylesheet" href="@Assets["app.css"]"/>
     <link rel="stylesheet" href="@Assets["AntalyaStation.styles.css"]"/>
     <ImportMap/>
@@ -17,6 +24,12 @@
 <body>
 <Routes/>
 <ReconnectModal/>
+
+<!-- Blazor Bootstrap için gerekli scriptler -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="_content/Blazor.Bootstrap/blazor.bootstrap.js"></script>
+
+<!-- Senin mevcut framework scriptin -->
 <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 

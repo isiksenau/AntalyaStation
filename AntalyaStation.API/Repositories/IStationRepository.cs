@@ -1,10 +1,22 @@
-﻿using AntalyaStation.API.Models; // Station modelini kullanabilmek için ekledik
+﻿using AntalyaStation.API.DTOs;
+using AntalyaStation.API.Models;
 
 namespace AntalyaStation.API.Repositories
 {
     public interface IStationRepository
     {
-        Task<(List<Station> Data, int TotalCount)> GetPagedStationsAsync(int pageNumber, int pageSize);// Sayfalama (Pagination) için veriyi getiren imza
-        Task InsertManyAsync(List<Station> stations); //Toplu istasyon ekleme
+        // Temel sayfalama
+        Task<(List<Station> Data, int TotalCount)> GetPagedStationsAsync(int pageNumber, int pageSize);
+        
+        // Gelişmiş filtreleme
+        Task<(List<Station> Data, int TotalCount)> GetFilteredStationsAsync(StationFilterDto filter, int pageNumber, int pageSize);
+        
+        // Toplu ekleme
+        Task InsertManyAsync(List<Station> stations);
+
+        // 🆕 YENİ CRUD METOTLARI
+        Task AddAsync(Station station);
+        Task<bool> UpdateAsync(string id, Station station);
+        Task<bool> DeleteAsync(string id);
     }
-}//(Interface): Yapılabilecek işlemleri listeler (GetById, GetAll, Create, Update, Delete)
+}

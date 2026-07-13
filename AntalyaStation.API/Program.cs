@@ -4,9 +4,9 @@ using AntalyaStation.API.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-
+using System.Net;
 var builder = WebApplication.CreateBuilder(args);
-
+ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
 // ==========================================
 // 1. AYARLAR VE DIŞ KÜTÜPHANE YAPILANDIRMALARI
 // ==========================================

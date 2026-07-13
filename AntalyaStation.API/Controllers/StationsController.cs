@@ -1,43 +1,64 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AntalyaStation.API.DTOs;
+using AntalyaStation.API.Models;
 using AntalyaStation.API.Repositories;
+using Microsoft.AspNetCore.Mvc;
 
-namespace AntalyaStation.API.Controllers;
-
-[ApiController]
-[Route("api/[controller]")] // Adresi: api/stations olacak
-public class StationController : ControllerBase
-{//İstasyonları listeleme (GET), silme (DELETE) ve güncelleme (PUT) kapıları.
-    private readonly IStationRepository _stationRepository;
-
-    // Veritabanı sorgu katmanını (Repository) Dependency Injection ile içeri alıyoruz
-    public StationController(IStationRepository stationRepository)
+namespace AntalyaStation.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class StationsController : ControllerBase
     {
-        _stationRepository = stationRepository;
-    }
+        private readonly IStationRepository _repository;
 
-    /// <summary>
-    /// MongoDB'deki istasyonları sayfa numarası ve sayfa boyutuna göre filtreleyerek getirir.
-    /// Bu yapı Blazor tarafında performanslı bir listeleme (Pagination) yapmamızı sağlayacak.
-    /// </summary>
-    [HttpGet] // GET isteği atıldığında çalışır
-    public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
-    {
-        // Sayfalama parametrelerinin negatif değerler olmaması için güvenlik kontrolü
-        if (pageNumber < 1 || pageSize < 1)
+        public StationsController(IStationRepository repository)
         {
-            return BadRequest("Sayfa numarası (pageNumber) ve sayfa boyutu (pageSize) 1'den küçük olamaz.");
+            _repository = repository;
+        }
+        
+        [HttpGet]
+        public async Task<IActionResult> Get(
+            [FromQuery] StationFilterDto filter, 
+            [FromQuery] int pageNumber = 1, 
+            [FromQuery] int pageSize = 10)
+        {
+            // [FromQuery] sayesinde Blazor'dan gelen tüm filtreler otomatik olarak filter nesnesine dolar.
+            var (data, totalCount) = await _repository.GetFilteredStationsAsync(filter, pageNumber, pageSize);
+
+            return Ok(new 
+            { 
+                Data = data, 
+                TotalCount = totalCount 
+            });
         }
 
-        // Veritabanından hem o sayfaya ait verileri hem de toplam kayıt sayısını aynı anda çekiyoruz
-        var (stations, totalCount) = await _stationRepository.GetPagedStationsAsync(pageNumber, pageSize);
-
-        // UI katmanının (Blazor) sayfalamayı doğru çizebilmesi için gerekli meta bilgileriyle birlikte dönüyoruz
-        return Ok(new
+        [HttpPost]
+        public async Task<IActionResult> Post([FromBody] Station station)
         {
-            TotalCount = totalCount,
-            PageNumber = pageNumber,
-            PageSize = pageSize,
-            Data = stations
-        });
+            if (station == null) return BadRequest("İstasyon verisi boş olamaz.");
+
+            await _repository.AddAsync(station);
+            return CreatedAtAction(nameof(Get), new { searchText = station.StationName }, station);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Put(string id, [FromBody] Station station)
+        {
+            if (station == null) return BadRequest("Güncellenecek veri geçersiz.");
+
+            var isUpdated = await _repository.UpdateAsync(id, station);
+            if (!isUpdated) return NotFound("Güncellenecek istasyon bulunamadı.");
+
+            return NoContent();
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(string id)
+        {
+            var isDeleted = await _repository.DeleteAsync(id);
+            if (!isDeleted) return NotFound("Silinecek istasyon bulunamadı.");
+
+            return Ok(new { Message = "İstasyon başarıyla silindi." });
+        }
     }
 }
