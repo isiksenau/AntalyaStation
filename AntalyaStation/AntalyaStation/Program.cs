@@ -13,7 +13,12 @@ builder.Services.AddHttpClient();
 // Blazor Bootstrap servisini ekliyoruz
 builder.Services.AddBlazorBootstrap();
 
+
+builder.Services.AddCascadingAuthenticationState();
+
+
 var app = builder.Build();
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

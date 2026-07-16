@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using AntalyaStation.API.Services;
-
+using Microsoft.AspNetCore.Authorization;
 namespace AntalyaStation.API.Controllers;
 
 [ApiController]
@@ -15,7 +15,8 @@ public class StationImportController : ControllerBase
     }
 
     [HttpPost("excel")]
-    public async Task<IActionResult> ImportExcel(IFormFile file)
+    [Authorize] 
+    public async Task<IActionResult> ImportExcel(IFormFile? file)
     {
         // 1. Dosya Kontrolü
         if (file == null || file.Length == 0)

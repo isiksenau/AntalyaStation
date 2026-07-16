@@ -5,53 +5,89 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Net;
-var builder = WebApplication.CreateBuilder(args);
-ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-// ==========================================
-// 1. AYARLAR VE DIŞ KÜTÜPHANE YAPILANDIRMALARI
-// ==========================================
-// Veritabanı bağlantı ayarlarını appsettings.json'dan okuyoruz.
-builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using AntalyaStation.API;   // BearerSecuritySchemeTransformer burada
+using Scalar.AspNetCore;
 
-// EPPlus Excel kütüphanesinin lisans ayarını yapıyoruz.
+var builder = WebApplication.CreateBuilder(args);
+
+ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+
+// ==========================================================
+// 1. AYARLAR
+// ==========================================================
+builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 OfficeOpenXml.ExcelPackage.License.SetNonCommercialPersonal("isu");
 
-// ==========================================
-// 2. BAĞIMLILIKLARIN ENJEKTE EDİLMESİ (Dependency Injection)
-// ==========================================
-// Veritabanı sorgularını yürütecek olan Repository katmanımızı sisteme tanıtıyoruz.
+// ==========================================================
+// 2. DI
+// ==========================================================
 builder.Services.AddScoped<IStationRepository, MongoStationRepository>();
-
-// Excel dosyalarını okuyacak olan akıllı Servis katmanımızı sisteme tanıtıyoruz (Az önce eksik olan yer!).
 builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
 
-// API Controller (Dış kapı) mimarisini projeye dahil ediyoruz.
 builder.Services.AddControllers();
 
-// Swagger (Arayüz test ekranı) motorlarını sisteme ekliyoruz.
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// 🔑 Native OpenAPI + JWT şeması (TEK KEZ, class üzerinden)
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+});
 
-// ==========================================
-// 3. UYGULAMANIN İNŞA EDİLMESİ (BUILD)
-// ==========================================
-// Bu satırdan sonra yukarıdaki "builder.Services" alanına hiçbir şey eklenemez!
+// 🔑 JWT Authentication (TEK KEZ)
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+
+            ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
+            ValidAudience = builder.Configuration["JwtSettings:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:SecretKey"]
+                    ?? "CokGizliVeUzunBirVarsayilanKeyBurayaGelmeli123!")
+            )
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// 💡 CORS servisini ekliyoruz (builder.Build() satırının üstünde olmalı!)
+builder.Services.AddCors();
+
+// ==========================================================
+// 3. BUILD
+// ==========================================================
 var app = builder.Build();
 
-// ==========================================
-// 4. HTTP REQUEST PIPELINE (MIDDLEWARES)
-// ==========================================
-// Geliştirme ortamındaysak Swagger arayüzünü tarayıcıya açıyoruz.
-//if (app.Environment.IsDevelopment())
-//{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-//}
 
-// Güvenlik, HTTPS yönlendirmesi ve Controller haritalama işlemleri.
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+}
+
 app.UseHttpsRedirection();
+
+// 💡 Blazor'dan gelen tüm istek kapılarını ardına kadar açıyoruz:
+app.UseCors(policy => policy
+    .AllowAnyOrigin()
+    .AllowAnyHeader()
+    .AllowAnyMethod());
+
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
-// Projeyi resmen ayağa kaldırıp dinlemeye başlıyoruz.
 app.Run();

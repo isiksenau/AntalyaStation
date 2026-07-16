@@ -1,29 +1,92 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">AntalyaStation</a>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler"/>
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
+<div class="nav-scrollable">
+    <nav class="flex-column">
+        
+        <!-- 🏠 Home -->
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
             </NavLink>
         </div>
 
+        <!-- 📊 Analysis & Charts -->
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            <NavLink class="nav-link" href="analysis">
+                <span class="bi bi-bar-chart-line-fill-nav-menu" aria-hidden="true"></span> Analysis & Charts
             </NavLink>
         </div>
 
+        <!-- 📥 Add Data (Admin Only) -->
+        <AuthorizeView Roles="Admin">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="add-data">
+                        <span class="bi bi-plus-circle-fill-nav-menu" aria-hidden="true"></span> Add Data
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <!-- 👁️ View Data -->
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+            <NavLink class="nav-link" href="view-data">
+                <span class="bi bi-table-nav-menu" aria-hidden="true"></span> View Data
             </NavLink>
         </div>
+
+        <!-- 🗺️ Maps -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="map">
+                <span class="bi bi-map-fill-nav-menu" aria-hidden="true"></span> Maps
+            </NavLink>
+        </div>
+
+        <!-- 👥 User Management (Admin Only) -->
+        <AuthorizeView Roles="Admin">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="user-management">
+                        <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> User Management
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <!-- ⚙️ Settings & Profile (Dropdown) -->
+        <div class="nav-item px-3">
+            <div class="nav-link custom-dropdown-toggle" @onclick="ToggleSettings" style="cursor: pointer;">
+                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Settings & Profile
+                <span class="ms-auto bi @(isSettingsOpen ? "bi-chevron-up" : "bi-chevron-down")"></span>
+            </div>
+            
+            @if (isSettingsOpen)
+            {
+                <div class="submenu-container ps-4">
+                    <NavLink class="nav-link submenu-link" href="profile/my-info">
+                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> My Info
+                    </NavLink>
+                    <NavLink class="nav-link submenu-link" href="profile/change-password">
+                        <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> Change Password
+                    </NavLink>
+                </div>
+            }
+        </div>
+
     </nav>
 </div>
+
+@code {
+    private bool isSettingsOpen = false;
+
+    private void ToggleSettings()
+    {
+        isSettingsOpen = !isSettingsOpen;
+    }
+}

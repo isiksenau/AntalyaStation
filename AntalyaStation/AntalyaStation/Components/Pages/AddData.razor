@@ -1,0 +1,6 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@page "/add-data"
+@attribute [Authorize(Roles = "Admin")]
+
+<h3>📥 Data Management Center</h3>
+<p>Welcome, Admin. Here you can import new charging stations via Excel upload or add them manually using the dynamic form.</p>

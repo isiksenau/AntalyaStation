@@ -2,6 +2,8 @@
 
 namespace AntalyaStation.API.DTOs
 {
+    // 💡 KOPYA LOGIN DTO SINIFINI BURADAN SİLDİK!
+
     public class StationDto
     {
         public string? SearchText { get; set; }
@@ -16,11 +18,14 @@ namespace AntalyaStation.API.DTOs
         public string City { get; set; } = "ANTALYA"; 
         public string District { get; set; } = string.Empty; 
         public int TotalSockets { get; set; }
-        
         public bool IsGreenCharging { get; set; } 
         public bool IsSmartCharging { get; set; } 
-
         public List<SocketDto> Sockets { get; set; } = new();
+        // 🕒 Verinin veritabanına kaydedildiği tarih
+        public DateTime AddedDate { get; set; } = DateTime.UtcNow;
+
+        // 🆕 Excel'den veya formdan yeni eklenenleri işaretleyeceğimiz bayrak
+        public bool IsNew { get; set; } = true;
     }
 
     public class SocketDto

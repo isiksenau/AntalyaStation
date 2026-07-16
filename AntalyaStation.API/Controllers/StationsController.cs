@@ -2,6 +2,7 @@
 using AntalyaStation.API.Models;
 using AntalyaStation.API.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AntalyaStation.API.Controllers
 {
@@ -33,6 +34,7 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpPost]
+        [Authorize] // 🔒 Sadece giriş yapmış olanlar yeni istasyon ekleyebilir!
         public async Task<IActionResult> Post([FromBody] Station station)
         {
             if (station == null) return BadRequest("İstasyon verisi boş olamaz.");
@@ -42,9 +44,17 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize] 
         public async Task<IActionResult> Put(string id, [FromBody] Station station)
         {
             if (station == null) return BadRequest("Güncellenecek veri geçersiz.");
+
+            // 💡 İŞTE O SİHİRLİ SATIR:
+            // Gövdede null gelen Id alanına, URL'den aldığımız o doğru ID'yi zorla eşitliyoruz.
+            station.Id = id; 
+    
+            // NOT: Eğer modelindeki Id alanı "ObjectId" tipindeyse yukarıdaki satır yerine şunu yaz:
+            // station.Id = MongoDB.Bson.ObjectId.Parse(id);
 
             var isUpdated = await _repository.UpdateAsync(id, station);
             if (!isUpdated) return NotFound("Güncellenecek istasyon bulunamadı.");
@@ -53,6 +63,7 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize] 
         public async Task<IActionResult> Delete(string id)
         {
             var isDeleted = await _repository.DeleteAsync(id);

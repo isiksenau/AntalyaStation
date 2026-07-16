@@ -1,0 +1,89 @@
+﻿@page "/login"
+@using Microsoft.AspNetCore.Components.Authorization
+@using AntalyaStation.Client.Handlers
+@rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveWebAssemblyRenderMode(prerender: false))
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<div class="login-container" style="max-width: 400px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; background-color: #1e1e1e; color: white;">
+    <h3 style="margin-bottom: 20px; text-align: center;">Giriş Yap</h3>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" style="color: #ff6b6b; margin-bottom: 15px; text-align: center;">@errorMessage</div>
+    }
+
+    @* 💡 FormName="LoginForm" parametresini ekleyerek hatayı çözüyoruz *@
+    <EditForm Model="@loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
+        <DataAnnotationsValidator />
+        
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px;">Kullanıcı Adı veya E-posta:</label>
+            <InputText @bind-Value="loginModel.Username" class="form-control" style="width: 100%; padding: 8px; background-color: #2d2d2d; color: white; border: 1px solid #444; border-radius: 4px;" />
+            <ValidationMessage For="@(() => loginModel.Username)" style="color: #ff6b6b; font-size: 12px;" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 5px;">Şifre:</label>
+            <InputText @bind-Value="loginModel.Password" type="password" class="form-control" style="width: 100%; padding: 8px; background-color: #2d2d2d; color: white; border: 1px solid #444; border-radius: 4px;" />
+            <ValidationMessage For="@(() => loginModel.Password)" style="color: #ff6b6b; font-size: 12px;" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            Giriş Yap
+        </button>
+    </EditForm>
+</div>
+
+@code {
+    // 💡 Formdan gelen verileri yakalamak için nitelik ekledik
+    [SupplyParameterFromForm]
+    public LoginDto loginModel { get; set; } = new LoginDto();
+    
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/login", loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResultDto>();
+                if (result != null && !string.IsNullOrEmpty(result.Token))
+                {
+                    // Token'ı kaydedip state'i güncelliyoruz
+                    var customProvider = (CustomAuthStateProvider)AuthStateProvider;
+                    await customProvider.MarkUserAsAuthenticated(result.Token);
+                    
+                    // Ana sayfaya yönlendiriyoruz
+                    Navigation.NavigateTo("/");
+                }
+            }
+            else
+            {
+                // 🔍 Hatanın gerçek yüzünü görmek için API'den gelen ham cevabı okuyoruz:
+                var errorContent = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Giriş Başarısız! Hata Kodu: {(int)response.StatusCode} ({response.StatusCode}). API Mesajı: {errorContent}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Bağlantı Hatası Oluştu: {ex.Message}";
+        }
+    }
+
+    public class LoginDto
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    public class LoginResultDto
+    {
+        public string Token { get; set; } = string.Empty;
+    }
+}

@@ -27,6 +27,11 @@ namespace AntalyaStation.API.Models
         public bool IsSmartCharging { get; set; }
 
         public List<Socket> Sockets { get; set; } = new();
+        // 🕒 Verinin veritabanına kaydedildiği tarih
+        public DateTime AddedDate { get; set; } = DateTime.UtcNow;
+
+        // 🆕 Excel'den veya formdan yeni eklenenleri işaretleyeceğimiz bayrak
+        public bool IsNew { get; set; } = true;
     }
 
     public class Socket
