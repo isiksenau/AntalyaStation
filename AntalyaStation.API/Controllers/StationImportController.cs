@@ -34,5 +34,7 @@ public class StationImportController : ControllerBase
             // 3. 500 Hatası alırsan buradaki hata mesajı sana sebebini söyleyecek (örn: "NullReference" veya "IndexOutRange")
             return StatusCode(500, new { Error = "İşlem sırasında hata oluştu.", Detail = ex.Message });
         }
+        
     }
+    
 }

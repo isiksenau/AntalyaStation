@@ -5,18 +5,15 @@ namespace AntalyaStation.API.Repositories
 {
     public interface IStationRepository
     {
-        // Temel sayfalama
-        Task<(List<Station> Data, int TotalCount)> GetPagedStationsAsync(int pageNumber, int pageSize);
-        
-        // Gelişmiş filtreleme
-        Task<(List<Station> Data, int TotalCount)> GetFilteredStationsAsync(StationFilterDto filter, int pageNumber, int pageSize);
-        
-        // Toplu ekleme
-        Task InsertManyAsync(List<Station> stations);
+        // 🟢 UYUM: Burası IEnumerable olmalı
+        Task<IEnumerable<Station>> GetAllAsync();
 
-        // 🆕 YENİ CRUD METOTLARI
+        Task<(List<Station> Data, int TotalCount)> GetPagedStationsAsync(int pageNumber, int pageSize);
+        Task<(List<Station> Data, int TotalCount)> GetFilteredStationsAsync(StationFilterDto filter, int pageNumber, int pageSize);
+        Task InsertManyAsync(List<Station> stations);
         Task AddAsync(Station station);
         Task<bool> UpdateAsync(string id, Station station);
         Task<bool> DeleteAsync(string id);
+        Task ClearAllStationsAsync();
     }
 }

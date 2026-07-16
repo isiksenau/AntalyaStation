@@ -8,17 +8,21 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
-builder.Services.AddHttpClient();
+// --- 🎯 İŞTE DÜZELTMEMİZ GEREKEN KISIM BURASI ---
+// HttpClient'ı burada BaseAddress ile kaydediyoruz. 
+// Port numaran 5079 ise bu şekilde kalmalı, değilse API'nin portuyla değiştir.
+builder.Services.AddScoped(sp => new HttpClient 
+{ 
+    BaseAddress = new Uri("http://localhost:5079") 
+});
+// ------------------------------------------------
 
 // Blazor Bootstrap servisini ekliyoruz
 builder.Services.AddBlazorBootstrap();
 
-
 builder.Services.AddCascadingAuthenticationState();
 
-
 var app = builder.Build();
-
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -28,7 +32,6 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -38,6 +41,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()

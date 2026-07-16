@@ -192,6 +192,9 @@
                             <Button Color="ButtonColor.Danger" Size="ButtonSize.Small" @onclick="() => DeleteStation(context)">🗑️</Button>
                         </div>
                     </GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Kayıt Tarihi" PropertyName="CreatedAt">
+                        @context.AddedDate.ToString("dd.MM.yyyy HH:mm")
+                    </GridColumn>
                 </GridColumns>
             </Grid>
         </div>

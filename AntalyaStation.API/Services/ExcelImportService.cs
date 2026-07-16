@@ -2,6 +2,8 @@
 using AntalyaStation.API.Repositories;
 using OfficeOpenXml;
 using Microsoft.AspNetCore.Http;
+using System.Globalization;
+using System.Linq;
 
 namespace AntalyaStation.API.Services;
 
@@ -23,71 +25,70 @@ public class ExcelImportService : IExcelImportService
         var rowCount = worksheet.Dimension.End.Row;
 
         Station currentStation = null;
+        TextInfo textInfo = new CultureInfo("tr-TR", false).TextInfo;
 
         for (int row = 2; row <= rowCount; row++)
         {
-            // Sütun indeksleri görseline göre ayarlandı:
-            var stationNo = worksheet.Cells[row, 2].Value?.ToString()?.Trim();     // B Sütunu
-            var stationName = worksheet.Cells[row, 3].Value?.ToString()?.Trim();   // C Sütunu
-            var serviceType = worksheet.Cells[row, 4].Value?.ToString()?.Trim();   // D Sütunu
-            var brandName = worksheet.Cells[row, 5].Value?.ToString()?.Trim();     // E Sütunu
-            var operatorNetwork = worksheet.Cells[row, 6].Value?.ToString()?.Trim(); //F
-            var operatorStation = worksheet.Cells[row, 7].Value?.ToString()?.Trim(); //G
-            var address = worksheet.Cells[row, 9].Value?.ToString()?.Trim();       // I Sütunu
+            var stationNo = worksheet.Cells[row, 2].Value?.ToString()?.Trim();
+            var stationName = worksheet.Cells[row, 3].Value?.ToString()?.Trim();
+            var serviceType = worksheet.Cells[row, 4].Value?.ToString()?.Trim();
+            var brandName = worksheet.Cells[row, 5].Value?.ToString()?.Trim();
+            var operatorNetwork = worksheet.Cells[row, 6].Value?.ToString()?.Trim();
+            var operatorStation = worksheet.Cells[row, 7].Value?.ToString()?.Trim();
+            var address = worksheet.Cells[row, 9].Value?.ToString()?.Trim();
 
-            // Soket Bilgileri
-            var socketNo = worksheet.Cells[row, 10].Value?.ToString()?.Trim();     // J Sütunu
-            var socketType = worksheet.Cells[row, 12].Value?.ToString()?.Trim();   // L Sütunu (Soket Türü: AC_TYPE2)
-            var socketPower = worksheet.Cells[row, 13].Value?.ToString()?.Trim();  // M Sütunu (Güç)
+            var socketNo = worksheet.Cells[row, 10].Value?.ToString()?.Trim();
+            var socketType = worksheet.Cells[row, 12].Value?.ToString()?.Trim();
+            var socketPower = worksheet.Cells[row, 13].Value?.ToString()?.Trim();
 
-            // 1. Yeni bir istasyon satırı mı?
+            // 1. FİLTRELEME: Çöp verileri atla
+            if (string.IsNullOrEmpty(stationNo) && string.IsNullOrEmpty(socketNo)) continue;
+            if (stationName != null && stationName.ToLower().Contains("advertise")) continue;
+
+            // 2. YENİ İSTASYON MU?
             if (!string.IsNullOrEmpty(stationNo))
             {
-                // Adresten Şehir/İlçe çıkarma (Basit mantık)
-                // Örn: "... / ANTALYA" bilgisini ayırmak için
-                string city = "Antalya"; 
-                string district = "Merkez"; // Adresten ayrıştırmak karmaşık olabilir, şimdilik varsayılan atadık.
-                
+                string city = "Antalya";
+                string district = "Merkez";
                 if (address != null && address.Contains("/"))
                 {
                     var parts = address.Split('/');
                     if (parts.Length > 1) city = parts.Last().Trim();
                 }
 
-                currentStation = new Station 
+                currentStation = new Station
                 {
                     StationNumber = stationNo,
-                    StationName = stationName ?? "Bilinmeyen İstasyon",
-                    Brand = brandName ?? "Bilinmeyen Marka",
-                    Address = address ?? "Adres Belirtilmemiş", // 🎯 Adres ataması
+                    StationName = textInfo.ToTitleCase(stationName?.ToLower() ?? "Bilinmeyen İstasyon"),
+                    Brand = textInfo.ToTitleCase(brandName?.ToLower() ?? "Bilinmeyen Marka"),
+                    Address = address ?? "Adres Belirtilmemiş",
                     City = city,
                     District = district,
-                    IsGreenCharging = false, 
-                    IsSmartCharging = false,
-                    Sockets = new List<Socket>(),
-
-                    // 🎯 BURASI ÇOK KRİTİK! Bu 3 satırın olduğundan emin olun:
                     ServiceType = serviceType ?? "Halka Açık",
                     OperatorNetwork = operatorNetwork ?? "Belirtilmemiş",
-                    OperatorStation = operatorStation ?? "Belirtilmemiş"
+                    OperatorStation = operatorStation ?? "Belirtilmemiş",
+                    Sockets = new List<Socket>()
                 };
                 stationList.Add(currentStation);
             }
-
-            // 2. Soket ekleme
+            // 3. SOKET Mİ? (Sadece geçerli bir istasyon varsa ekle)
             else if (currentStation != null && !string.IsNullOrEmpty(socketNo))
             {
+                double.TryParse(socketPower, out double powerVal);
                 currentStation.Sockets.Add(new Socket
                 {
                     SocketNumber = socketNo,
                     Type = socketType ?? "AC",
-                    Power = socketPower ?? "0"
+                    Power = powerVal
                 });
             }
         }
+
+        // Final hesaplamaları yap
         foreach (var station in stationList)
         {
-            station.TotalSockets = station.Sockets.Count;
+            station.SocketCount = station.Sockets.Count;
+            station.TotalPower = station.Sockets.Sum(s => s.Power);
         }
 
         if (stationList.Any())

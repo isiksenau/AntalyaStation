@@ -1,0 +1,47 @@
+﻿@page "/view-data"
+@inject HttpClient Http
+@using AntalyaStation.API.Models 
+
+<h3>👁️ Charging Stations Database</h3>
+
+@if (stations == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+        <tr>
+            <th>İstasyon No</th>
+            <th>Durum</th>
+            <th>İşlem</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var station in stations)
+        {
+            <tr>
+                <td>@station.StationNumber</td>
+                <td>
+                    @if (station.Status == "New") 
+                    { <span class="badge bg-success">YENİ</span> }
+                    else if (station.Status == "Removed") 
+                    { <span class="badge bg-danger">KALDIRILDI</span> }
+                </td>
+                <td>Edit / Delete</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Station>? stations;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // API'den verileri çekiyoruz (Controller'ındaki get metodunun yoluna göre)
+        stations = await Http.GetFromJsonAsync<List<Station>>("api/stations");
+    }
+}

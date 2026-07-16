@@ -24,10 +24,11 @@ OfficeOpenXml.ExcelPackage.License.SetNonCommercialPersonal("isu");
 // ==========================================================
 // 2. DI
 // ==========================================================
-builder.Services.AddScoped<IStationRepository, MongoStationRepository>();
 builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
-
+builder.Services.AddScoped<IStationService, StationService>();
+builder.Services.AddScoped<IStationRepository, MongoStationRepository>();
 builder.Services.AddControllers();
+
 
 // 🔑 Native OpenAPI + JWT şeması (TEK KEZ, class üzerinden)
 builder.Services.AddOpenApi(options =>

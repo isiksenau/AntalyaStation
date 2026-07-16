@@ -1,0 +1,83 @@
+﻿@page "/"
+@using AntalyaStation.API.DTOs
+@inject HttpClient Http
+
+<div class="container-fluid mt-4">
+    <h3 class="fw-bold mb-4">🏠 Genel Bakış Paneli</h3>
+
+    @if (stats == null)
+    {
+        <div class="spinner-border text-primary" role="status"></div>
+    }
+    else
+    {
+        <div class="row g-3">
+            <!-- 1. Kutucuk: Aktif İstasyonlar -->
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 bg-primary text-white p-3">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-ev-station display-6 me-3"></i>
+                        <div>
+                            <h6 class="mb-0 text-white-50">Aktif İstasyon</h6>
+                            <h2 class="fw-bold">@stats.TotalActiveStations</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Kutucuk: Toplam Soket -->
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 bg-success text-white p-3">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-plug display-6 me-3"></i>
+                        <div>
+                            <h6 class="mb-0 text-white-50">Toplam Soket</h6>
+                            <h2 class="fw-bold">@stats.TotalSocketCount</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Kutucuk: Toplam Güç -->
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 bg-info text-white p-3">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-lightning-charge display-6 me-3"></i>
+                        <div>
+                            <h6 class="mb-0 text-white-50">Toplam Güç (kW)</h6>
+                            <h2 class="fw-bold">@stats.TotalPowerCapacity.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Şirket Bazlı Özet (Yan Yana Kutucuklar) -->
+        <div class="row mt-4">
+            <div class="col-12 mb-3">
+                <h5 class="fw-bold">⚡ Şirket Bazlı Güç Dağılımı</h5>
+            </div>
+            @foreach (var company in stats.PowerByCompany)
+            {
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card shadow-sm border-0 h-100 p-3 text-center">
+                        <div class="text-muted small">@company.CompanyName</div>
+                        <div class="fw-bold fs-5">@company.TotalPower.ToString("N0") kW</div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardStatsDto? stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try {
+            stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
+        }
+        catch { /* Hata yönetimi */ }
+    }
+}
