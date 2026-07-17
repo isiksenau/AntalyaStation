@@ -57,12 +57,13 @@
             <div class="col-12 mb-3">
                 <h5 class="fw-bold">⚡ Şirket Bazlı Güç Dağılımı</h5>
             </div>
-            @foreach (var company in stats.PowerByCompany)
+            @* 💡 PowerByCompany listesini TotalPower değerine göre büyükten küçüğe sıralayarak dönüyoruz *@
+            @foreach (var company in stats.PowerByCompany.OrderByDescending(c => c.TotalPower))
             {
                 <div class="col-md-3 col-sm-6 mb-3">
-                    <div class="card shadow-sm border-0 h-100 p-3 text-center">
-                        <div class="text-muted small">@company.CompanyName</div>
-                        <div class="fw-bold fs-5">@company.TotalPower.ToString("N0") kW</div>
+                    <div class="card shadow-sm border-0 h-100 p-3 text-center" style="border-left: 4px solid #007bff !important;">
+                        <div class="text-muted small fw-semibold">@company.CompanyName</div>
+                        <div class="fw-bold fs-5 text-primary mt-1">@company.TotalPower.ToString("N0") kW</div>
                     </div>
                 </div>
             }

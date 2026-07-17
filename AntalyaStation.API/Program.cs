@@ -78,7 +78,10 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // 💡 Blazor'dan gelen tüm istek kapılarını ardına kadar açıyoruz:
 app.UseCors(policy => policy

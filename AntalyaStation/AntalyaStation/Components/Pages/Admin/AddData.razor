@@ -1,6 +1,445 @@
-﻿@using Microsoft.AspNetCore.Authorization
-@page "/admin/add-data"
+﻿@page "/admin/add-data"
 @attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@using AntalyaStation.API.DTOs
+@using Microsoft.AspNetCore.Authorization
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
 
-<h3>📥 Data Management Center</h3>
-<p>Welcome, Admin. Here you can import new charging stations via Excel upload or add them manually using the dynamic form.</p>
+<div class="container-fluid mt-3" style="font-size: 12px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold m-0" style="font-size: 16px;">📥 Manage Stations</h4>
+            <p class="text-muted m-0" style="font-size: 11px;">Add new charging stations manually, or edit and remove existing ones.</p>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- LEFT: ADD / EDIT FORM (İstikrarlı ve Bağımsız Kaydırılabilir Yapı) -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 rounded-3 sticky-top hide-scrollbar" 
+                 style="top: 1rem; max-height: calc(100vh - 3rem); overflow-y: auto; font-size: 12px;">
+                <div class="card-header bg-light fw-bold py-2 border-0 text-primary d-flex justify-content-between align-items-center">
+                    <span>@(isEditMode ? "✏️ Edit Station" : "➕ New Station")</span>
+                    @if (isEditMode)
+                    {
+                        <span class="badge bg-warning text-dark px-2 py-1" style="font-size: 10px;">ID: @currentStation.Id</span>
+                    }
+                </div>
+                <div class="card-body p-2.5">
+                    <EditForm Model="currentStation" OnValidSubmit="SaveStation">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger small mb-2 p-1 bg-danger-subtle rounded" style="font-size: 11px;" />
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold text-muted mb-0.5">Station Number</label>
+                            <InputText class="form-control form-control-sm py-1" @bind-Value="currentStation.StationNumber" />
+                            <ValidationMessage For="@(() => currentStation.StationNumber)" class="text-danger small d-block mt-0.5" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold text-muted mb-0.5">Station Name</label>
+                            <InputText class="form-control form-control-sm py-1" @bind-Value="currentStation.StationName" />
+                            <ValidationMessage For="@(() => currentStation.StationName)" class="text-danger small d-block mt-0.5" />
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-muted mb-0.5">Brand</label>
+                                <InputText class="form-control form-control-sm py-1" @bind-Value="currentStation.Brand" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-muted mb-0.5">Service Type</label>
+                                <InputSelect class="form-select form-select-sm py-1" @bind-Value="currentStation.ServiceType">
+                                    <option value="">Select...</option>
+                                    <option value="Public">Public</option>
+                                    <option value="Private">Private</option>
+                                </InputSelect>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-muted mb-0.5">Network Operator</label>
+                                <InputText class="form-control form-control-sm py-1" @bind-Value="currentStation.OperatorNetwork" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-muted mb-0.5">Station Operator</label>
+                                <InputText class="form-control form-control-sm py-1" @bind-Value="currentStation.OperatorStation" />
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-muted mb-0.5">City</label>
+                                <InputText class="form-control form-control-sm py-1" @bind-Value="currentStation.City" placeholder="ANTALYA" />
+                                <ValidationMessage For="@(() => currentStation.City)" class="text-danger small d-block mt-0.5" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-muted mb-0.5">District</label>
+                                <InputText class="form-control form-control-sm py-1" @bind-Value="currentStation.District" placeholder="Muratpaşa" />
+                                <ValidationMessage For="@(() => currentStation.District)" class="text-danger small d-block mt-0.5" />
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold text-muted mb-0.5">Address</label>
+                            <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="currentStation.Address"></InputTextArea>
+                        </div>
+
+                        <div class="d-flex gap-3 mb-2.5 py-1 justify-content-start align-items-center">
+                            <div class="form-check form-switch m-0">
+                                <InputCheckbox class="form-check-input" id="greenCheck" @bind-Value="currentStation.IsGreenCharging" />
+                                <label class="form-check-label small fw-semibold text-success" for="greenCheck">🌿 Green</label>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <InputCheckbox class="form-check-input" id="smartCheck" @bind-Value="currentStation.IsSmartCharging" />
+                                <label class="form-check-label small fw-semibold text-info" for="smartCheck">💡 Smart</label>
+                            </div>
+                        </div>
+
+                        <!-- SOCKETS AREA -->
+                        <div class="border rounded p-2 mb-3 bg-light-subtle">
+                            <div class="d-flex justify-content-between align-items-center mb-1.5">
+                                <span class="small fw-bold text-dark">🔌 Sockets (@(currentStation.Sockets?.Count ?? 0))</span>
+                                <button type="button" class="btn btn-xs btn-outline-primary px-2 py-0.5 rounded-pill" style="font-size: 11px;" @onclick="AddSocketRow">+ Add Row</button>
+                            </div>
+                            @if (currentStation.Sockets != null)
+                            {
+                                <div class="hide-scrollbar" style="max-height: 140px; overflow-y: auto;">
+                                    @foreach (var socket in currentStation.Sockets)
+                                    {
+                                        <div class="row g-1 mb-1 align-items-center">
+                                            <div class="col-4"><InputText class="form-control form-control-sm py-0.5 text-center" placeholder="No" @bind-Value="socket.SocketNumber" /></div>
+                                            <div class="col-3"><InputText class="form-control form-control-sm py-0.5 text-center" placeholder="Type" @bind-Value="socket.Type" /></div>
+                                            <div class="col-3"><InputNumber class="form-control form-control-sm py-0.5 text-center" placeholder="kW" @bind-Value="socket.Power" /></div>
+                                            <div class="col-2">
+                                                <button type="button" class="btn btn-sm btn-outline-danger w-100 py-0.5" @onclick="() => currentStation.Sockets.Remove(socket)">✕</button>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_errorMessage))
+                        {
+                            <div class="alert alert-danger p-1.5 mb-2 small shadow-sm text-center" style="font-size: 11px;">@_errorMessage</div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm flex-grow-1 py-1.5 fw-bold" disabled="@_isSaving">
+                                @if (_isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                }
+                                else
+                                {
+                                    <span>💾 @(isEditMode ? "Update Details" : "Save Station")</span>
+                                }
+                            </button>
+                            @if (isEditMode)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-1.5" @onclick="ResetForm">Cancel</button>
+                            }
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: STATION LIST (Gelişmiş Hızlı Filtre Paneli) -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 rounded-3" style="font-size: 12px;">
+                <div class="card-header bg-light fw-bold py-2 border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="text-dark">📋 Repository (@_totalCount Stations)</span>
+                    
+                    <div class="d-flex gap-1.5 align-items-center flex-wrap">
+                        @* 💡 YENİ EKLEME: AC/DC Hızlı Filtre Alanı *@
+                        <select class="form-select form-select-sm w-auto fw-semibold text-primary" style="height: 29px; font-size: 11px;" @bind="_stationType" @bind:after="OnTypeFilterChanged">
+                            <option value="Any">⚡ Type: All</option>
+                            <option value="AC">AC Only</option>
+                            <option value="DC">DC Only</option>
+                        </select>
+
+                        <select class="form-select form-select-sm w-auto" style="height: 29px; font-size: 11px;" @bind="_pageSize" @bind:after="OnPageSizeChanged">
+                            <option value="15">15 Rows</option>
+                            <option value="50">50 Rows</option>
+                            <option value="100">100 Rows</option>
+                        </select>
+                        
+                        <input type="text" class="form-control form-control-sm w-auto" style="min-width:180px; height: 29px; font-size: 11px;"
+                               placeholder="Quick filter..." @bind="_quickSearch" @bind:event="oninput" @onkeyup="OnQuickSearchKeyUp" />
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    @if (_isLoading)
+                    {
+                        <div class="text-center text-muted py-5">
+                            <div class="spinner-border text-primary spinner-border-sm mb-2" role="status"></div>
+                            <div style="font-size: 11px;">Loading records...</div>
+                        </div>
+                    }
+                    else if (!_stations.Any())
+                    {
+                        <div class="text-center text-muted py-5" style="font-size: 11px;">No records match your criteria.</div>
+                    }
+                    else
+                    {
+                        <table class="table table-sm table-hover table-bordered align-middle text-center mb-0">
+                            <thead class="table-light text-secondary small">
+                                <tr>
+                                    <th style="width: 80px;">No</th>
+                                    <th class="text-start">Station Name</th>
+                                    <th>Brand</th>
+                                    <th>City / District</th>
+                                    <th style="width: 70px;">Sockets</th>
+                                    <th>Last Sync</th>
+                                    <th class="text-end pe-2" style="width: 90px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var s in _stations)
+                                {
+                                    <tr>
+                                        <td class="text-muted">@s.StationNumber</td>
+                                        <td class="fw-semibold text-start text-dark">@s.StationName</td>
+                                        <td><span class="badge bg-light text-dark border">@s.Brand</span></td>
+                                        <td class="text-start small px-2">@s.City / @(string.IsNullOrEmpty(s.District) ? "Merkez" : s.District)</td>
+                                        <td><span class="badge bg-primary px-1.5 py-1">@s.SocketCount</span></td>
+                                        <td class="small text-muted" style="font-size: 11px;">@s.AddedDate.ToString("dd.MM.yyyy HH:mm")</td>
+                                        <td class="text-end pe-2">
+                                            <button class="btn btn-xs btn-outline-warning p-1 py-0" title="Edit" @onclick="() => EditStation(s)">✏️</button>
+                                            <button class="btn btn-xs btn-outline-danger p-1 py-0" title="Delete" @onclick="() => DeleteStation(s)">🗑️</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+                @if (_totalPages > 1)
+                {
+                    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-1.5">
+                        <span class="small text-muted" style="font-size: 11px;">Page @_pageNumber of @_totalPages</span>
+                        <div class="btn-group">
+                            <button class="btn btn-xs btn-outline-secondary px-2" disabled="@(_pageNumber <= 1)" @onclick="() => ChangePage(_pageNumber - 1)">← Prev</button>
+                            <button class="btn btn-xs btn-outline-secondary px-2" disabled="@(_pageNumber >= _totalPages)" @onclick="() => ChangePage(_pageNumber + 1)">Next →</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Tarayıcı scrollbar karmaşasını temizlemek için global minimal taslak class'ı */
+    .hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .btn-xs {
+        padding: 1px 5px;
+        font-size: 11px;
+        border-radius: 3px;
+    }
+</style>
+
+@code {
+    private string apiBaseUrl = "http://localhost:5079";
+
+    private List<StationDto> _stations = new();
+    private int _pageNumber = 1;
+    private int _pageSize = 15;
+    private int _totalCount = 0;
+    private int _totalPages => (int)Math.Ceiling(_totalCount / (double)_pageSize);
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _quickSearch = "";
+    private string _stationType = "Any"; // 💡 Yeni Filtre Değişkeni
+    private CancellationTokenSource? _searchDebounce;
+
+    private StationDto currentStation = new() { Sockets = new List<SocketDto>() };
+    private bool isEditMode = false;
+    private string _errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStations();
+    }
+
+    private async Task LoadStations()
+    {
+        _isLoading = true;
+        _errorMessage = "";
+        try
+        {
+            // 💡 URL'e stationType filtresi parametrik olarak entegre edildi
+            string typeParam = _stationType == "Any" ? "" : _stationType;
+
+            var url = $"{apiBaseUrl}/api/stations?pageNumber={_pageNumber}&pageSize={_pageSize}" +
+                      $"&searchText={Uri.EscapeDataString(_quickSearch ?? "")}" +
+                      $"&stationType={Uri.EscapeDataString(typeParam)}";
+
+            var response = await Http.GetFromJsonAsync<PagedResult<StationDto>>(url);
+            _stations = response?.Data ?? new List<StationDto>();
+            _totalCount = response?.TotalCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load error: {ex.Message}";
+            _stations = new List<StationDto>();
+            _totalCount = 0;
+        }
+        _isLoading = false;
+    }
+
+    private async Task OnPageSizeChanged()
+    {
+        _pageNumber = 1;
+        await LoadStations();
+    }
+
+    // 💡 AC/DC filtresi tetiklendiğinde çalışacak metod
+    private async Task OnTypeFilterChanged()
+    {
+        _pageNumber = 1;
+        await LoadStations();
+    }
+
+    private async Task OnQuickSearchKeyUp(KeyboardEventArgs e)
+    {
+        _searchDebounce?.Cancel();
+        _searchDebounce = new CancellationTokenSource();
+        var token = _searchDebounce.Token;
+        try
+        {
+            await Task.Delay(400, token);
+            if (!token.IsCancellationRequested)
+            {
+                _pageNumber = 1;
+                await LoadStations();
+            }
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task ChangePage(int newPage)
+    {
+        _pageNumber = newPage;
+        await LoadStations();
+    }
+
+    private void AddSocketRow()
+    {
+        currentStation.Sockets ??= new List<SocketDto>();
+        currentStation.Sockets.Add(new SocketDto());
+    }
+
+    private void EditStation(StationDto s)
+    {
+        isEditMode = true;
+        _errorMessage = "";
+        
+        currentStation = new StationDto
+        {
+            Id = s.Id,
+            StationNumber = s.StationNumber,
+            StationName = s.StationName,
+            Brand = s.Brand,
+            OperatorNetwork = s.OperatorNetwork,
+            OperatorStation = s.OperatorStation,
+            ServiceType = s.ServiceType,
+            Address = s.Address,
+            City = s.City,
+            District = s.District,
+            IsGreenCharging = s.IsGreenCharging,
+            IsSmartCharging = s.IsSmartCharging,
+            AddedDate = s.AddedDate,
+            Sockets = s.Sockets != null 
+                ? s.Sockets.Select(x => new SocketDto { SocketNumber = x.SocketNumber, Type = x.Type, Power = x.Power }).ToList() 
+                : new List<SocketDto>()
+        };
+    }
+
+    private void ResetForm()
+    {
+        isEditMode = false;
+        _errorMessage = "";
+        currentStation = new StationDto { Sockets = new List<SocketDto>(), City = "ANTALYA", District = "" };
+    }
+
+    private async Task SaveStation()
+    {
+        _errorMessage = "";
+        _isSaving = true;
+        try
+        {
+            currentStation.TotalSockets = currentStation.Sockets?.Count ?? 0;
+            currentStation.AddedDate = DateTime.Now;
+            
+            HttpResponseMessage response;
+            if (isEditMode)
+            {
+                response = await Http.PutAsJsonAsync($"{apiBaseUrl}/api/stations/{currentStation.Id}", currentStation);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync($"{apiBaseUrl}/api/stations", currentStation);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                ResetForm();
+                await LoadStations();
+            }
+            else
+            {
+                var rawError = await response.Content.ReadAsStringAsync();
+                _errorMessage = $"API Error ({(int)response.StatusCode}): {rawError}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Connection Error: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task DeleteStation(StationDto s)
+    {
+        _errorMessage = "";
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"Delete \"{s.StationName}\"? This cannot be undone.");
+        if (!confirmed) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"{apiBaseUrl}/api/stations/{s.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                if (currentStation.Id == s.Id) ResetForm();
+                await LoadStations();
+            }
+            else
+            {
+                var rawError = await response.Content.ReadAsStringAsync();
+                _errorMessage = $"Delete failed ({(int)response.StatusCode}): {rawError}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Delete error: {ex.Message}";
+        }
+    }
+
+    public class PagedResult<T>
+    {
+        public List<T> Data { get; set; } = new();
+        public int TotalCount { get; set; }
+    }
+}

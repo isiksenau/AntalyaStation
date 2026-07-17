@@ -1,47 +1,361 @@
 ﻿@page "/view-data"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Net.Http.Json
+@using AntalyaStation.API.DTOs
+@using BlazorBootstrap
 @inject HttpClient Http
-@using AntalyaStation.API.Models 
+@inject IJSRuntime JsRuntime
 
-<h3>👁️ Charging Stations Database</h3>
+@* 💡 GİZLİ KAYDIRMA ÇUBUĞU STİLİ: Yatay imleci tamamen yok eder ama metni seçerek yana kaydırmaya izin verir *@
+<style>
+    .hide-scrollbar {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE ve Edge */
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+    }
+</style>
 
-@if (stations == null)
-{
-    <p>Loading...</p>
-}
-else
-{
-    <table class="table">
-        <thead>
-        <tr>
-            <th>İstasyon No</th>
-            <th>Durum</th>
-            <th>İşlem</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var station in stations)
+<div class="container-fluid mt-3" style="font-size: 13px;">
+
+    <!-- 1. TOP SECTION: COMPACT FILTER PANEL -->
+    <div class="card shadow-sm border-0 rounded-3 mb-3">
+        <div class="card-body p-2 bg-light rounded-3">
+            <div class="row g-2 align-items-end">
+                <!-- Search Field -->
+                <div class="col-md-3">
+                    <label class="fw-semibold text-muted d-block mb-1" style="font-size: 11px;">Search</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white py-0 px-2"><i class="bi bi-search text-primary" style="font-size: 11px;"></i></span>
+                        <input type="text" class="form-control form-control-sm" @bind="_filter.SearchText"
+                               placeholder="Station name, no, brand...">
+                    </div>
+                </div>
+
+                <!-- City Selection -->
+                <div class="col-md-2">
+                    <label class="fw-semibold text-muted d-block mb-1" style="font-size: 11px;">City</label>
+                    <select class="form-select form-select-sm" value="@_filter.City" @onchange="OnCityChanged">
+                        <option value="Any">Any</option>
+                        @foreach (var city in _citiesAndDistricts.Keys)
+                        {
+                            <option value="@city">@city</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- District Selection -->
+                <div class="col-md-2">
+                    @if (_filter.City != "Any")
+                    {
+                        <label class="fw-semibold text-muted d-block mb-1" style="font-size: 11px;">District</label>
+                        <select class="form-select form-select-sm" @bind="_filter.District">
+                            <option value="Any">All Districts</option>
+                            @if (_citiesAndDistricts.ContainsKey(_filter.City))
+                            {
+                                @foreach (var district in _citiesAndDistricts[_filter.City])
+                                {
+                                    <option value="@district">@district</option>
+                                }
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <label class="fw-semibold text-muted d-block mb-1 text-black-50" style="font-size: 11px;">
+                            District <span style="font-size: 8px; opacity: 0.6;">(Select City)</span>
+                        </label>
+                        <select class="form-select form-select-sm" disabled><option>Any</option></select>
+                    }
+                </div>
+
+                <!-- Service Type -->
+                <div class="col-md-2">
+                    <label class="fw-semibold text-muted d-block mb-1" style="font-size: 11px;">Service Type</label>
+                    <select class="form-select form-select-sm" @bind="_filter.ServiceType">
+                        <option value="Any">Any</option>
+                        <option value="Halka Açık">Public</option>
+                        <option value="Özel">Private</option>
+                    </select>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="col-md-3 d-flex gap-1">
+                    <button class="btn btn-primary btn-sm flex-grow-1" style="height: 31px; font-size: 12px;" @onclick="ExecuteQuery">🔍 Run Query</button>
+                    <button class="btn btn-outline-secondary btn-sm" style="height: 31px; font-size: 12px;" @onclick="ClearFilters">🧹 Clear</button>
+                </div>
+            </div>
+
+            <!-- ADVANCED CRITERIA -->
+            <div class="accordion accordion-flush mt-1" id="advancedFilterAccordion">
+                <div class="accordion-item border-0 bg-transparent">
+                    <h2 class="accordion-header" id="flush-headingOne">
+                        <button class="accordion-button collapsed ps-0 py-1 text-primary fw-semibold" style="font-size: 11px; background: transparent !important;" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapseOne">
+                            ⚙️ Advanced Settings
+                        </button>
+                    </h2>
+                    <div id="flush-collapseOne" class="accordion-collapse collapse" data-bs-parent="#advancedFilterAccordion">
+                        <div class="accordion-body p-1">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-md-2">
+                                    <select class="form-select form-select-sm" @bind="_filter.StationType">
+                                        <option value="Any">Type: Any</option>
+                                        <option value="AC">AC</option>
+                                        <option value="DC">DC</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 d-flex gap-3">
+                                    <div class="form-check m-0">
+                                        <input type="checkbox" class="form-check-input" id="greenCheckFilter" @bind="_isGreenChecked">
+                                        <label class="form-check-label text-muted fw-semibold" style="font-size: 11px;" for="greenCheckFilter">🌿 Green Energy</label>
+                                    </div>
+                                    <div class="form-check m-0">
+                                        <input type="checkbox" class="form-check-input" id="smartCheckFilter" @bind="_isSmartChecked">
+                                        <label class="form-check-label text-muted fw-semibold" style="font-size: 11px;" for="smartCheckFilter">💡 Smart Charging</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. BOTTOM SECTION: COMPACT DATA TABLE -->
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body p-2">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <h6 class="text-dark fw-bold m-0" style="font-size: 13px;">Charging Stations Repository</h6>
+                <div class="d-flex gap-2 align-items-center">
+                    <div class="d-flex align-items-center gap-1 bg-light p-1 rounded border" style="height: 31px;">
+                        <label class="small text-muted fw-bold m-0 text-nowrap px-1" style="font-size: 11px;">Show:</label>
+                        <select class="form-select form-select-sm border-0 bg-transparent fw-bold text-primary py-0" style="width: 65px; font-size: 11px;" value="@_pageSize" @onchange="OnPageSizeChanged">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <Button Color="ButtonColor.Info" Size="ButtonSize.Small" Class="text-white py-1" Style="height: 31px; font-size: 11px;" @onclick="ExportToExcel">📊 Excel (.xls)</Button>
+                </div>
+            </div>
+
+            <Grid @ref="grid" TItem="StationDto" DataProvider="StationsDataProvider" AllowPaging="true" PageSize="@_pageSize" Class="table table-sm table-hover table-bordered text-center align-middle mb-0 small" Responsive="true">
+                <GridColumns>
+                    <GridColumn TItem="StationDto" HeaderText="Station No" PropertyName="StationNumber">@context.StationNumber</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Station Name" PropertyName="StationName" Class="fw-semibold text-start">@context.StationName</GridColumn>
+
+                    <GridColumn TItem="StationDto" HeaderText="Service Type" PropertyName="ServiceType">
+                        @{
+                            var serviceValue = context.ServiceType?.ToUpper() ?? "";
+                            if (string.IsNullOrWhiteSpace(serviceValue))
+                            {
+                                <span class="text-danger small">Not Provided</span>
+                            }
+                            else if (serviceValue.Contains("HALKA") || serviceValue.Contains("ACIK") || serviceValue.Contains("PUBLIC"))
+                            {
+                                <span class="fw-semibold text-success">Public</span>
+                            }
+                            else if (serviceValue.Contains("OZEL") || serviceValue.Contains("PRIVATE"))
+                            {
+                                <span class="fw-semibold text-warning">Private</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-light text-dark border">@context.ServiceType</span>
+                            }
+                        }
+                    </GridColumn>
+
+                    <GridColumn TItem="StationDto" HeaderText="Brand">@context.Brand</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Network">@context.OperatorNetwork</GridColumn>
+
+                    <GridColumn TItem="StationDto" HeaderText="Sockets">
+                        <div class="d-flex align-items-center justify-content-center gap-1">
+                            <span class="badge bg-primary px-1.5 py-1" style="font-size: 10px;">@context.SocketCount Pcs</span>
+                            <button type="button" class="btn btn-xs btn-info text-white px-1 py-0" style="font-size: 10px;" @onclick="() => OpenSocketDetails(context)">🔍 View</button>
+                        </div>
+                    </GridColumn>
+
+                    @* 💡 YENİ DÜZENLEME: Üç nokta kalktı, yatay kaydırma çubuğu gizlendi ama metin seçilerek yana kaydırılabilir duruma getirildi *@
+                    <GridColumn TItem="StationDto" HeaderText="Full Address" Class="text-start">
+                        <div class="d-flex justify-content-between align-items-center mb-0.5">
+                            <div class="fw-semibold text-dark" style="font-size: 11px;">
+                                @context.City @(string.IsNullOrEmpty(context.District) ? "" : $"/ {context.District}")
+                            </div>
+                            @if (!string.IsNullOrEmpty(context.Address))
+                            {
+                                <button type="button" class="btn btn-link p-0 m-0 lh-1 text-decoration-none shadow-none" 
+                                        @onclick="() => CopyToClipboard(context.Address)" 
+                                        title="Copy Full Address">
+                                    <i class="bi bi-clipboard text-muted" style="font-size: 12px; cursor: pointer;" onmouseover="this.className='bi bi-clipboard-fill text-primary'" onmouseout="this.className='bi bi-clipboard text-muted'"></i>
+                                </button>
+                            }
+                        </div>
+                        <div class="hide-scrollbar" 
+                             style="max-width: 250px; overflow-x: auto; white-space: nowrap; font-size: 11px; color: #6c757d; line-height: 1.3; cursor: text;" 
+                             title="@context.Address">
+                            @context.Address
+                        </div>
+                    </GridColumn>
+                </GridColumns>
+            </Grid>
+        </div>
+    </div>
+</div>
+
+<!-- 🔌 SOCKET DETAILS MODAL WINDOW -->
+<Modal @ref="socketDetailsModal" Title="🔌 Socket Configuration" IsVerticallyCentered="true">
+    <BodyTemplate>
+        @if (selectedStationForSockets != null)
         {
-            <tr>
-                <td>@station.StationNumber</td>
-                <td>
-                    @if (station.Status == "New") 
-                    { <span class="badge bg-success">YENİ</span> }
-                    else if (station.Status == "Removed") 
-                    { <span class="badge bg-danger">KALDIRILDI</span> }
-                </td>
-                <td>Edit / Delete</td>
-            </tr>
+            <div class="mb-3">
+                <h6 class="fw-bold text-primary">@selectedStationForSockets.StationName</h6>
+                <small class="text-muted">Station No: @selectedStationForSockets.StationNumber</small>
+            </div>
+
+            <table class="table table-sm table-striped table-bordered text-center align-middle small">
+                <thead class="table-dark">
+                <tr>
+                    <th>Socket No</th>
+                    <th>Type</th>
+                    <th>Power (kW)</th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (selectedStationForSockets.Sockets != null && selectedStationForSockets.Sockets.Any())
+                {
+                    @foreach (var socket in selectedStationForSockets.Sockets)
+                    {
+                        <tr>
+                            <td class="fw-bold">@socket.SocketNumber</td>
+                            <td><span class="badge bg-secondary">@socket.Type</span></td>
+                            <td class="text-success fw-bold">@socket.Power kW</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="3" class="text-muted py-2">No sockets found.</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
         }
-        </tbody>
-    </table>
-}
+        <div class="d-flex justify-content-end mt-3">
+            <Button Color="ButtonColor.Secondary" Size="ButtonSize.Small" @onclick="CloseSocketModal">Close</Button>
+        </div>
+    </BodyTemplate>
+</Modal>
 
 @code {
-    private List<Station>? stations;
+    private Grid<StationDto> grid = default!;
+    private Modal socketDetailsModal = default!;
+    private StationDto? selectedStationForSockets;
 
-    protected override async Task OnInitializedAsync()
+    private int _pageSize = 10;
+    private bool _isGreenChecked;
+    private bool _isSmartChecked;
+    private List<StationDto> allCurrentData = new();
+
+    private StationFilterDto _filter = new() { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any" };
+    private string apiBaseUrl = "http://localhost:5079";
+
+    private Dictionary<string, List<string>> _citiesAndDistricts = new()
     {
-        // API'den verileri çekiyoruz (Controller'ındaki get metodunun yoluna göre)
-        stations = await Http.GetFromJsonAsync<List<Station>>("api/stations");
+        { "ANTALYA", new List<string> { "Aksu", "Alanya", "Döşemealtı", "Elmalı", "Finike", "Gazipaşa", "Gündoğmuş", "İbradı", "Demre", "Kaş", "Kemer", "Kepez", "Konyaaltı", "Korkuteli", "Kumluca", "Manavgat", "Muratpaşa", "Serik" } }
+    };
+
+    private async Task CopyToClipboard(string address)
+    {
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", address);
+        }
+    }
+
+    private void OnCityChanged(ChangeEventArgs e)
+    {
+        _filter.City = e.Value?.ToString() ?? "Any";
+        _filter.District = "Any";
+    }
+
+    private async Task OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int size))
+        {
+            _pageSize = size;
+            StateHasChanged();
+            await Task.Delay(20);
+            
+            if (grid != null)
+            {
+                await grid.RefreshDataAsync();
+            }
+        }
+    }
+
+    private async Task ExecuteQuery()
+    {
+        if (grid != null) await grid.RefreshDataAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        _filter = new StationFilterDto { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any", SearchText = "" };
+        _isGreenChecked = false;
+        _isSmartChecked = false;
+        if (grid != null) await grid.RefreshDataAsync();
+    }
+
+    private async Task<GridDataProviderResult<StationDto>> StationsDataProvider(GridDataProviderRequest<StationDto> request)
+    {
+        try
+        {
+            string cityParam = _filter.City == "Any" ? "" : _filter.City;
+            string districtParam = _filter.District == "Any" ? "" : _filter.District;
+            string serviceParam = _filter.ServiceType == "Any" ? "" : _filter.ServiceType;
+            string typeParam = _filter.StationType == "Any" ? "" : _filter.StationType;
+
+            var url = $"{apiBaseUrl}/api/stations?pageNumber={request.PageNumber}&pageSize={request.PageSize}" +
+                      $"&searchText={Uri.EscapeDataString(_filter.SearchText ?? "")}" +
+                      $"&city={Uri.EscapeDataString(cityParam)}" +
+                      $"&district={Uri.EscapeDataString(districtParam)}" +
+                      $"&serviceType={Uri.EscapeDataString(serviceParam)}" +
+                      $"&stationType={Uri.EscapeDataString(typeParam)}" +
+                      $"&isGreenCharging={(_isGreenChecked ? "true" : "")}" +
+                      $"&isSmartCharging={(_isSmartChecked ? "true" : "")}";
+
+            var response = await Http.GetFromJsonAsync<PagedResult<StationDto>>(url);
+            if (response != null)
+            {
+                allCurrentData = response.Data;
+                return new GridDataProviderResult<StationDto> { Data = response.Data, TotalCount = response.TotalCount };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Grid data link error: {ex.Message}");
+        }
+        return new GridDataProviderResult<StationDto> { Data = new List<StationDto>(), TotalCount = 0 };
+    }
+
+    private async Task OpenSocketDetails(StationDto station)
+    {
+        selectedStationForSockets = station;
+        await socketDetailsModal.ShowAsync();
+    }
+
+    private async Task CloseSocketModal() => await socketDetailsModal.HideAsync();
+
+    private async Task ExportToExcel() { /* Excel download interop */ }
+
+    public class PagedResult<T>
+    {
+        public List<T> Data { get; set; } = new();
+        public int TotalCount { get; set; }
     }
 }

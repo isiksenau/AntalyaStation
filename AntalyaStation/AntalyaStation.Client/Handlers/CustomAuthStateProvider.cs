@@ -19,14 +19,26 @@ namespace AntalyaStation.Client.Handlers
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            var token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            string? token = null;
+
+            try
+            {
+                token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            }
+            catch (InvalidOperationException)
+            {
+                // Statik prerender aşamasındayız, JS interop henüz mümkün değil.
+                // Anonim state döndürüyoruz; interaktif hale geçince bu metod
+                // tekrar çağrılıp gerçek token okunacak.
+                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            }
 
             if (string.IsNullOrEmpty(token))
             {
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
 
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", token);
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt")));
         }
@@ -52,9 +64,9 @@ namespace AntalyaStation.Client.Handlers
             var payload = jwt.Split('.')[1];
             var jsonBytes = ParseBase64WithoutPadding(payload);
             var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
-            
+
             if (keyValuePairs == null) return Array.Empty<Claim>();
-            
+
             return keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value?.ToString() ?? string.Empty));
         }
 

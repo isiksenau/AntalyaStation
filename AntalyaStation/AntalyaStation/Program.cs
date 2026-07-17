@@ -1,5 +1,8 @@
+using AntalyaStation.Client.Handlers;
 using AntalyaStation.Client.Pages;
 using AntalyaStation.Components;
+using AntalyaStation.Client.Handlers;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,7 +24,8 @@ builder.Services.AddScoped(sp => new HttpClient
 builder.Services.AddBlazorBootstrap();
 
 builder.Services.AddCascadingAuthenticationState();
-
+// 🔑 Kendi custom provider'ımızı kaydediyoruz — varsayılanın üzerine yazar
+builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

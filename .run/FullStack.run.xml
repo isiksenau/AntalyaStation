@@ -1,0 +1,7 @@
+﻿<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="FullStack" type="CompoundRunConfigurationType">
+    <toRun name="AntalyaStation.API: http" type="LaunchSettings" />
+    <toRun name="AntalyaStation: http" type="LaunchSettings" />
+    <method v="2" />
+  </configuration>
+</component>

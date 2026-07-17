@@ -41,11 +41,13 @@ public class ExcelImportService : IExcelImportService
             var socketType = worksheet.Cells[row, 12].Value?.ToString()?.Trim();
             var socketPower = worksheet.Cells[row, 13].Value?.ToString()?.Trim();
 
-            // 1. FİLTRELEME: Çöp verileri atla
+            // ... (Önceki değişken okumaları aynı kalıyor) ...
+
+// 1. FİLTRELEME: Çöp verileri atla
             if (string.IsNullOrEmpty(stationNo) && string.IsNullOrEmpty(socketNo)) continue;
             if (stationName != null && stationName.ToLower().Contains("advertise")) continue;
 
-            // 2. YENİ İSTASYON MU?
+// 2. YENİ İSTASYON MU?
             if (!string.IsNullOrEmpty(stationNo))
             {
                 string city = "Antalya";
@@ -69,9 +71,24 @@ public class ExcelImportService : IExcelImportService
                     OperatorStation = operatorStation ?? "Belirtilmemiş",
                     Sockets = new List<Socket>()
                 };
+
+                // 🟢 BUG FIX: İstasyonun ilk satırındaki sokak bilgisini de hemen ekliyoruz!
+                if (!string.IsNullOrEmpty(socketNo))
+                {
+                    double.TryParse(socketPower, out double powerVal);
+                    currentStation.Sockets.Add(new Socket
+                    {
+                        SocketNumber = socketNo,
+                        Type = socketType ?? "AC",
+                        Power = powerVal
+                    });
+                }
+
                 stationList.Add(currentStation);
             }
-            // 3. SOKET Mİ? (Sadece geçerli bir istasyon varsa ekle)
+
+
+// 3. SONRAKİ SOKETLER Mİ? (İstasyon numarası boş ama sokak numarası dolu olan satırlar)
             else if (currentStation != null && !string.IsNullOrEmpty(socketNo))
             {
                 double.TryParse(socketPower, out double powerVal);
@@ -85,17 +102,17 @@ public class ExcelImportService : IExcelImportService
         }
 
         // Final hesaplamaları yap
-        foreach (var station in stationList)
-        {
-            station.SocketCount = station.Sockets.Count;
-            station.TotalPower = station.Sockets.Sum(s => s.Power);
-        }
+            foreach (var station in stationList)
+            {
+                station.SocketCount = station.Sockets.Count;
+                station.TotalPower = station.Sockets.Sum(s => s.Power);
+            }
 
-        if (stationList.Any())
-        {
-            await _stationRepository.InsertManyAsync(stationList);
-        }
+            if (stationList.Any())
+            {
+                await _stationRepository.InsertManyAsync(stationList);
+            }
 
-        return stationList.Count;
+            return stationList.Count;
+        }
     }
-}

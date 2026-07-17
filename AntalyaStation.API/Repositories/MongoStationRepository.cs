@@ -48,16 +48,17 @@ namespace AntalyaStation.API.Repositories
                 var nameFilter = builder.Regex(s => s.StationName, searchRegex);
                 var numberFilter = builder.Regex(s => s.StationNumber, searchRegex);
                 var brandFilter = builder.Regex(s => s.Brand, searchRegex);
+                var operatorFilter = builder.Regex(s => s.OperatorNetwork, searchRegex); // 🆕
 
-                filterDefinition &= builder.Or(nameFilter, numberFilter, brandFilter);
+                filterDefinition &= builder.Or(nameFilter, numberFilter, brandFilter, operatorFilter);
             }
-
+/*
             if (!string.IsNullOrWhiteSpace(filter.Brand))
                 filterDefinition &= builder.Regex(s => s.Brand, new BsonRegularExpression(filter.Brand, "i"));
 
             if (!string.IsNullOrWhiteSpace(filter.OperatorNetwork))
                 filterDefinition &= builder.Regex(s => s.OperatorNetwork, new BsonRegularExpression(filter.OperatorNetwork, "i"));
-
+*/
             if (!string.IsNullOrWhiteSpace(filter.City))
                 filterDefinition &= builder.Regex(s => s.City, new BsonRegularExpression($"^{filter.City}$", "i"));
 
