@@ -1,0 +1,470 @@
+﻿@page "/admin/excel-upload"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
+
+<style>
+    /* ===== Page header ===== */
+    .du-header {
+        background: linear-gradient(135deg, #0d47a1 0%, #1976d2 60%, #00acc1 100%);
+        border-radius: 16px;
+        padding: 28px 32px;
+        color: #fff;
+        margin-bottom: 24px;
+        box-shadow: 0 8px 24px rgba(13,71,161,0.2);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .du-header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+    .du-header h3 { font-weight: 800; margin-bottom: 2px; }
+    .du-header p { opacity: 0.9; margin-bottom: 0; font-size: 14px; }
+
+    /* ===== Cards ===== */
+    .du-card {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #eef0f2;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+        padding: 28px;
+        height: 100%;
+    }
+    .du-card-title {
+        font-weight: 700;
+        font-size: 16px;
+        color: #212529;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .du-card-subtitle {
+        font-size: 13px;
+        color: #6c757d;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+
+    /* ===== Upload zone ===== */
+    .du-upload-zone {
+        border: 2px dashed #d0d7de;
+        border-radius: 12px;
+        background-color: #f8f9fb;
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .du-upload-zone:hover {
+        border-color: #1976d2;
+        background-color: #f0f7ff;
+    }
+    .du-upload-zone-label {
+        cursor: pointer;
+        width: 100%;
+        color: #495057;
+    }
+    .du-file-hint {
+        font-size: 12px;
+        color: #8a939c;
+    }
+
+    /* ===== Summary box ===== */
+    .du-summary-box {
+        margin-top: 20px;
+        border-radius: 10px;
+        background: #f0f7ff;
+        border: 1px solid #cfe2ff;
+        padding: 16px 18px;
+    }
+    .du-summary-title {
+        font-weight: 700;
+        font-size: 13px;
+        color: #0d47a1;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .du-summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        font-size: 13px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .du-summary-row:last-child { border-bottom: none; }
+    .du-summary-row span:first-child { color: #6c757d; }
+
+    /* ===== Danger / removal zones ===== */
+    .du-danger-zone {
+        border-radius: 10px;
+        background: #fff5f5;
+        border: 1px solid #f5c2c7;
+        padding: 18px 20px;
+        margin-bottom: 16px;
+    }
+    .du-danger-zone-title {
+        font-weight: 700;
+        font-size: 13px;
+        color: #b02a37;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .du-danger-zone-help {
+        font-size: 12px;
+        color: #8a5a5f;
+        margin-bottom: 12px;
+    }
+
+    /* ===== Alerts ===== */
+    .du-alert {
+        margin-top: 16px;
+        border-radius: 10px;
+        padding: 12px 16px;
+        font-size: 13px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .du-alert-success { background: #e6f7ee; color: #16794e; border: 1px solid #b7ecd0; }
+    .du-alert-error { background: #fdeaea; color: #c0392b; border: 1px solid #f3c1bc; }
+
+    .du-empty-note {
+        font-size: 12px;
+        color: #adb5bd;
+        text-align: center;
+        padding: 10px 0;
+    }
+</style>
+
+<div class="container-fluid py-3">
+
+    <!-- ===== PAGE HEADER ===== -->
+    <div class="du-header">
+        <div class="du-header-icon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+        <div>
+            <h3>Station Data Import</h3>
+            <p>Upload station lists from Excel and manage past imports.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- ===== LEFT: UPLOAD ===== -->
+        <div class="col-lg-5">
+            <div class="du-card">
+                <div class="du-card-title"><i class="bi bi-file-earmark-spreadsheet text-primary"></i> Upload File</div>
+                <div class="du-card-subtitle">
+                    Select an Excel (.xlsx) file with station data. New stations will be added.
+                    Existing stations will not be changed.
+                </div>
+
+                <div class="du-upload-zone mb-3">
+                    <InputFile OnChange="OnInputFileChange" accept=".xlsx" class="d-none" id="excelFileInput" disabled="@isUploading" />
+                    <label for="excelFileInput" class="du-upload-zone-label d-flex flex-column align-items-center justify-content-center p-4">
+                        <i class="bi bi-filetype-xlsx text-success" style="font-size: 2.5rem;"></i>
+                        <span class="fw-semibold mt-2">@(selectedFile != null ? selectedFile.Name : "Click to choose a file")</span>
+                        <span class="du-file-hint mt-1">Maximum size: 10 MB</span>
+                    </label>
+                </div>
+
+                <button @onclick="ExecuteSynchronization" class="btn btn-primary w-100 py-2 fw-semibold" disabled="@(selectedFile == null || isUploading)">
+                    @if (isUploading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Uploading...</span>
+                    }
+                    else
+                    {
+                        <span><i class="bi bi-upload me-1"></i> Upload</span>
+                    }
+                </button>
+
+                @if (uploadSummary != null)
+                {
+                    <div class="du-summary-box">
+                        <div class="du-summary-title"><i class="bi bi-clipboard-check"></i> Import Result</div>
+                        <div class="du-summary-row">
+                            <span>Rows read</span>
+                            <span class="fw-semibold">@uploadSummary.TotalRows</span>
+                        </div>
+                        <div class="du-summary-row">
+                            <span>Stations added</span>
+                            <span class="fw-semibold text-success">+@uploadSummary.InsertedRows</span>
+                        </div>
+                        <div class="du-summary-row">
+                            <span>Rows skipped</span>
+                            <span class="fw-semibold text-warning">@uploadSummary.SkippedRows</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(uploadSummary.BatchId))
+                        {
+                            <div class="du-summary-row">
+                                <span>Batch ID</span>
+                                <span class="fw-semibold">@uploadSummary.BatchId</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(uploadFeedback))
+                {
+                    <div class="du-alert @(uploadSuccess ? "du-alert-success" : "du-alert-error")">
+                        <i class="bi @(uploadSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill")"></i>
+                        <span>@uploadFeedback</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- ===== RIGHT: REMOVE DATA ===== -->
+        <div class="col-lg-7">
+            <div class="du-card">
+                <div class="du-card-title text-danger"><i class="bi bi-trash3"></i> Remove Imported Data</div>
+                <div class="du-card-subtitle">
+                    Remove stations that came from a specific import. You can remove by date or by batch.
+                </div>
+
+                <!-- Remove by date -->
+                <div class="du-danger-zone">
+                    <div class="du-danger-zone-title"><i class="bi bi-calendar-x"></i> Remove by Date</div>
+                    <div class="du-danger-zone-help">Removes all stations imported on the selected date.</div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-7">
+                            <label class="form-label small text-muted mb-1">Date</label>
+                            <input type="date" @bind="targetDeletionDate" class="form-control form-control-sm" />
+                        </div>
+                        <div class="col-md-5">
+                            <button @onclick="PurgeByTimelineDate" class="btn btn-outline-danger btn-sm w-100 fw-semibold" disabled="@isPurging">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Remove by batch -->
+                <div class="du-danger-zone mb-0">
+                    <div class="du-danger-zone-title"><i class="bi bi-layers-half"></i> Remove by Batch</div>
+                    <div class="du-danger-zone-help">Removes all stations from one import batch.</div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label small text-muted mb-1">Batch</label>
+                            <select @bind="selectedBatchId" class="form-select form-select-sm">
+                                <option value="">-- Select a batch --</option>
+                                @foreach (var batch in activeBatches)
+                                {
+                                    <option value="@batch.Key">Batch @batch.Key — @batch.Value station(s)</option>
+                                }
+                            </select>
+                            @if (!activeBatches.Any())
+                            {
+                                <div class="du-empty-note">No import batches available.</div>
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <button @onclick="PurgeByBatchReference" class="btn btn-danger btn-sm w-100 fw-semibold" disabled="@(string.IsNullOrEmpty(selectedBatchId) || isPurging)">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(operationalFeedback))
+                {
+                    <div class="du-alert @(purgeSuccess ? "du-alert-success" : "du-alert-error")">
+                        <i class="bi @(purgeSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill")"></i>
+                        <span>@operationalFeedback</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private IBrowserFile? selectedFile;
+    private bool isUploading = false;
+    private bool isPurging = false;
+
+    private string? uploadFeedback;
+    private bool uploadSuccess;
+
+    private string? operationalFeedback;
+    private bool purgeSuccess;
+
+    private string selectedBatchId = "";
+    private DateTime targetDeletionDate = DateTime.Today;
+
+    private ImportSummaryDto? uploadSummary;
+    private Dictionary<string, int> activeBatches = new();
+
+    protected override async Task OnInitializedAsync() => await SyncActiveBatches();
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        uploadSummary = null;
+        uploadFeedback = null;
+    }
+
+    private async Task EnforceAuthorizationHeader()
+    {
+        try
+        {
+            var token = await JsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Auth header enforcement skipped: {ex.Message}");
+        }
+    }
+
+    private async Task SyncActiveBatches()
+    {
+        try
+        {
+            await EnforceAuthorizationHeader();
+            activeBatches = await Http.GetFromJsonAsync<Dictionary<string, int>>("api/stations/import-batches") ?? new();
+        }
+        catch
+        {
+            activeBatches = new Dictionary<string, int>();
+        }
+    }
+
+    private async Task ExecuteSynchronization()
+    {
+        if (selectedFile == null) return;
+        isUploading = true;
+        uploadSummary = null;
+        uploadFeedback = null;
+
+        try
+        {
+            await EnforceAuthorizationHeader();
+
+            using var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024));
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(selectedFile.ContentType);
+            content.Add(fileContent, "file", selectedFile.Name);
+
+            var response = await Http.PostAsync("api/stations/import-excel", content);
+            if (response.IsSuccessStatusCode)
+            {
+                uploadSummary = await response.Content.ReadFromJsonAsync<ImportSummaryDto>();
+                uploadFeedback = "File uploaded successfully.";
+                uploadSuccess = true;
+                await SyncActiveBatches();
+                selectedFile = null;
+            }
+            else
+            {
+                var errorStatusCode = (int)response.StatusCode;
+                var rawError = await response.Content.ReadAsStringAsync();
+                uploadFeedback = $"Upload failed (HTTP {errorStatusCode}): {rawError}";
+                uploadSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadFeedback = $"Something went wrong: {ex.Message}";
+            uploadSuccess = false;
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task PurgeByTimelineDate()
+    {
+        isPurging = true;
+        operationalFeedback = null;
+        try
+        {
+            await EnforceAuthorizationHeader();
+            var formattedDate = targetDeletionDate.ToString("yyyy-MM-dd");
+            var response = await Http.DeleteAsync($"api/stations/purge-by-date?date={formattedDate}");
+            if (response.IsSuccessStatusCode)
+            {
+                var serverResult = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+                operationalFeedback = serverResult?.GetValueOrDefault("message") ?? "Stations removed successfully.";
+                purgeSuccess = true;
+                await SyncActiveBatches();
+            }
+            else
+            {
+                operationalFeedback = $"Removal failed (HTTP {(int)response.StatusCode}).";
+                purgeSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            operationalFeedback = $"Something went wrong: {ex.Message}";
+            purgeSuccess = false;
+        }
+        finally
+        {
+            isPurging = false;
+        }
+    }
+
+    private async Task PurgeByBatchReference()
+    {
+        if (string.IsNullOrEmpty(selectedBatchId)) return;
+        isPurging = true;
+        operationalFeedback = null;
+
+        try
+        {
+            await EnforceAuthorizationHeader();
+            var response = await Http.DeleteAsync($"api/stations/purge-by-batch/{selectedBatchId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var serverResult = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+                operationalFeedback = serverResult?.GetValueOrDefault("message") ?? "Batch removed successfully.";
+                purgeSuccess = true;
+                selectedBatchId = "";
+                await SyncActiveBatches();
+            }
+            else
+            {
+                operationalFeedback = $"Removal failed (HTTP {(int)response.StatusCode}).";
+                purgeSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            operationalFeedback = $"Something went wrong: {ex.Message}";
+            purgeSuccess = false;
+        }
+        finally
+        {
+            isPurging = false;
+        }
+    }
+
+    public class ImportSummaryDto
+    {
+        public int TotalRows { get; set; }
+        public int InsertedRows { get; set; }
+        public int SkippedRows { get; set; }
+        public string BatchId { get; set; } = string.Empty;
+    }
+}
