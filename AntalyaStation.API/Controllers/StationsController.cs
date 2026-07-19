@@ -14,13 +14,20 @@ namespace AntalyaStation.API.Controllers
     {
         private readonly IStationRepository _repository;
         private readonly IStationService _stationService;
+        private readonly IExcelImportService _excelImportService;
 
-        // TEK CONSTRUCTOR: Hem repository hem service buradan enjekte edilir.
-        public StationsController(IStationRepository repository, IStationService stationService)
+        // UNIFIED CONSTRUCTOR: All core repository, telemetry, and integration services are injected here.
+        public StationsController(
+            IStationRepository repository, 
+            IStationService stationService,
+            IExcelImportService excelImportService)
         {
             _repository = repository;
             _stationService = stationService;
+            _excelImportService = excelImportService;
         }
+
+        #region --- Standard Data Queries & Telemetry ---
 
         [HttpGet]
         public async Task<IActionResult> Get(
@@ -39,55 +46,128 @@ namespace AntalyaStation.API.Controllers
             return Ok(stats);
         }
 
+        [HttpGet("cities")]
+        public async Task<IActionResult> GetCities()
+        {
+            var cities = await _repository.GetDistinctCitiesAsync();
+            return Ok(cities);
+        }
+
+        [HttpGet("cities/{city}/districts")]
+        public async Task<IActionResult> GetDistricts(string city)
+        {
+            var districts = await _repository.GetDistrictsByCityAsync(city);
+            return Ok(districts);
+        }
+
+        #endregion
+
+        #region --- Individual CRUD Modifications ---
+
         [HttpPost]
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Post([FromBody] Station station)
         {
-            if (station == null) return BadRequest("İstasyon verisi boş olamaz.");
+            if (station == null) return BadRequest("Station data cannot be empty.");
 
-            // 🟢 SUNUCU TARAFLI HESAPLAMA (Frontend'e güvenme, kendin hesapla)
+            // SERVER-SIDE CALCULATION: Protect processing integrity from client payload variations
             station.SocketCount = station.Sockets?.Count ?? 0;
             station.TotalPower = station.Sockets?.Sum(s => s.Power) ?? 0;
     
-            // Tarihi de burada setlemek daha garantidir
             station.AddedDate = DateTime.Now; 
             station.IsNew = true;
             station.Status = "Active";
 
             await _repository.AddAsync(station);
 
-            // 🟢 CreatedAtAction içine id parametresini eklemek daha temizdir
             return CreatedAtAction(nameof(Get), new { id = station.Id }, station);
         }
 
         [HttpPut("{id}")]
-        [Authorize] 
+        [Authorize(Roles = "Admin")] 
         public async Task<IActionResult> Put(string id, [FromBody] Station station)
         {
-            if (station == null) return BadRequest("Güncellenecek veri geçersiz.");
+            if (station == null) return BadRequest("The target update payload is invalid.");
             station.Id = id; 
+            
             var isUpdated = await _repository.UpdateAsync(id, station);
-            if (!isUpdated) return NotFound("Güncellenecek istasyon bulunamadı.");
+            if (!isUpdated) return NotFound("The requested charging station could not be found.");
+            
             return NoContent();
         }
 
         [HttpDelete("{id}")]
-        [Authorize] 
+        [Authorize(Roles = "Admin")] 
         public async Task<IActionResult> Delete(string id)
         {
             var isDeleted = await _repository.DeleteAsync(id);
-            if (!isDeleted) return NotFound("Silinecek istasyon bulunamadı.");
-            return Ok(new { Message = "İstasyon başarıyla silindi." });
+            if (!isDeleted) return NotFound("The target charging station could not be found.");
+            
+            return Ok(new { Message = "Station record deleted successfully." });
         }
+
+        #endregion
+
+        #region --- Enterprise Bulk Operations & Maintenance ---
+
+        [HttpPost("import-excel")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ImportExcel(IFormFile? file, [FromServices] IExcelImportService excelImportService)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { error = "Please select a valid Excel file to upload." });
+
+            try
+            {
+                var summary = await excelImportService.ImportStationsFromExcelAsync(file);
+                return Ok(summary);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "An internal error occurred during processing operation.", detail = ex.Message });
+            }
+        }
+
+        [HttpGet("import-batches")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetImportBatches()
+        {
+            var batches = await _excelImportService.GetActiveImportBatchesAsync();
+            return Ok(batches);
+        }
+
+        [HttpDelete("purge-by-date")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> PurgeByDate([FromQuery] string date)
+        {
+            if (!DateTime.TryParse(date, out DateTime parsedDate))
+                return BadRequest(new { Message = "Provided date string format could not be verified." });
+
+            int count = await _excelImportService.PurgeStationsByDateAsync(parsedDate);
+            return Ok(new { Message = $"Batch transaction complete. Purged {count} entries from matching date constraint." });
+        }
+
+        [HttpDelete("purge-by-batch/{batchId}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> PurgeByBatch(string batchId)
+        {
+            if (string.IsNullOrEmpty(batchId))
+                return BadRequest(new { Message = "Target batch tracking identifier context cannot be null." });
+
+            int count = await _excelImportService.PurgeStationsByBatchIdAsync(batchId);
+            return Ok(new { Message = $"Batch group drop successful. Cleared {count} nodes matching Token Reference: {batchId}." });
+        }
+
         [HttpDelete("clear-all")]
-        [Authorize] // Güvenlik için, sadece yetkili kişiler silsin
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ClearAll()
         {
             await _repository.ClearAllStationsAsync();
-            return Ok(new { Message = "Veritabanı başarıyla temizlendi." });
+            return Ok(new { Message = "Database repository cleared successfully." });
         }
+
         [HttpPost("cleanup-data")]
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CleanupData()
         {
             var stations = (await _repository.GetAllAsync()).ToList();
@@ -98,23 +178,21 @@ namespace AntalyaStation.API.Controllers
             {
                 bool isChanged = false;
 
-                // 1. İsimleri düzelt
                 var newName = textInfo.ToTitleCase(s.StationName.ToLower());
                 if (s.StationName != newName) { s.StationName = newName; isChanged = true; }
 
-                // 2. 0 değerlerini kontrol et (Eğer soket var ama güç 0 ise, belki soket verisi hatalıdır)
-                // Burada istersen soketleri yeniden hesaplayıp TotalPower'ı güncelleyebilirsin
                 var calculatedPower = s.Sockets.Sum(x => x.Power);
                 if (s.TotalPower != calculatedPower) { s.TotalPower = calculatedPower; isChanged = true; }
 
-                // 3. Değişiklik varsa güncelle
                 if (isChanged)
                 {
                     await _repository.UpdateAsync(s.Id, s);
                     cleanedCount++;
                 }
             }
-            return Ok(new { Message = $"{cleanedCount} adet istasyon verisi temizlendi ve düzenlendi." });
+            return Ok(new { Message = $"{cleanedCount} station records successfully cleaned and optimized." });
         }
+
+        #endregion
     }
 }

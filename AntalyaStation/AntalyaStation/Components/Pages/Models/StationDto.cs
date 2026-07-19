@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace AntalyaStation.API.DTOs
 {
@@ -26,6 +27,13 @@ namespace AntalyaStation.API.DTOs
         public double TotalPower { get; set; }
         public int SocketCount { get; set; }
         public string Status { get; set; } = "Active";
+        
+        public class ImportSummaryDto
+        {
+            public int TotalRows { get; set; }
+            public int InsertedRows { get; set; }
+            public int SkippedRows { get; set; }
+        }
     }
 
     public class SocketDto

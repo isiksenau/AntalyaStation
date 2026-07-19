@@ -1,4 +1,7 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.JSInterop;
 
 namespace AntalyaStation.Client.Handlers
@@ -14,12 +17,20 @@ namespace AntalyaStation.Client.Handlers
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            // Tarayıcı hafızasından token'ı okuyoruz
-            var token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
-
-            if (!string.IsNullOrEmpty(token))
+            try
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // 🟢 DÜZELTME: JS interop henüz hazır değilse (prerender aşaması,
+                // circuit henüz kurulmamış vb.) sessizce devam et — token'sız istek
+                // gönderilir, bu login isteği için zaten normaldir.
             }
 
             return await base.SendAsync(request, cancellationToken);

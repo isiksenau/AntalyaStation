@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using AntalyaStation.API;   // BearerSecuritySchemeTransformer burada
 using Scalar.AspNetCore;
+using OfficeOpenXml;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,7 +20,8 @@ ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProt
 // 1. AYARLAR
 // ==========================================================
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
-OfficeOpenXml.ExcelPackage.License.SetNonCommercialPersonal("isu");
+//OfficeOpenXml.ExcelPackage.License.SetNonCommercialPersonal("isu");
+OfficeOpenXml.ExcelPackage.License.SetNonCommercialPersonal("AntalyaStation");
 
 // ==========================================================
 // 2. DI
@@ -29,6 +31,8 @@ builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IStationRepository, MongoStationRepository>();
 builder.Services.AddControllers();
 
+builder.Services.AddScoped<IUserRepository, MongoUserRepository>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 // 🔑 Native OpenAPI + JWT şeması (TEK KEZ, class üzerinden)
 builder.Services.AddOpenApi(options =>
@@ -64,6 +68,7 @@ builder.Services.AddAuthorization();
 
 // 💡 CORS servisini ekliyoruz (builder.Build() satırının üstünde olmalı!)
 builder.Services.AddCors();
+
 
 // ==========================================================
 // 3. BUILD

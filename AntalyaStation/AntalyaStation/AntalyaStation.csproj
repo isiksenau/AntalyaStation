@@ -11,6 +11,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\AntalyaStation.API\AntalyaStation.API.csproj" />
         <ProjectReference Include="..\AntalyaStation.Client\AntalyaStation.Client.csproj"/>
+        <PackageReference Include="Blazor-ApexCharts" Version="6.1.0" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.1"/>
     </ItemGroup>
 

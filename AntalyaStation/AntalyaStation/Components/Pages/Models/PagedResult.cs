@@ -1,4 +1,6 @@
-﻿namespace AntalyaStation.Components.Pages.Models 
+﻿using System.Collections.Generic;
+
+namespace AntalyaStation.Components.Pages.Models 
 {
     public class PagedResult<T>
     {

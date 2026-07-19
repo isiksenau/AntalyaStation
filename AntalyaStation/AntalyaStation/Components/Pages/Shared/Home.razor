@@ -1,84 +1,229 @@
 ﻿@page "/"
 @using AntalyaStation.API.DTOs
+@using System.Linq
 @inject HttpClient Http
 
-<div class="container-fluid mt-4">
-    <h3 class="fw-bold mb-4">🏠 Genel Bakış Paneli</h3>
+<div class="container-fluid px-4 py-4">
+
+    <!-- HERO -->
+    <div class="hero-banner mb-4">
+        <div class="hero-overlay">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge-live"><i class="bi bi-broadcast"></i> CANLI VERİ</span>
+            </div>
+            <h1 class="hero-title">AntalyaStation</h1>
+            <p class="hero-subtitle">Antalya genelindeki elektrikli araç şarj istasyonları için kurumsal izleme ve analiz platformu.</p>
+        </div>
+        <i class="bi bi-ev-station hero-icon"></i>
+    </div>
 
     @if (stats == null)
     {
+    <div class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
+        <div class="text-muted mt-2">Loading dashboard metrics...</div>
+    </div>
     }
     else
     {
-        <div class="row g-3">
-            <!-- 1. Kutucuk: Aktif İstasyonlar -->
-            <div class="col-md-4">
-                <div class="card shadow-sm border-0 bg-primary text-white p-3">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-ev-station display-6 me-3"></i>
-                        <div>
-                            <h6 class="mb-0 text-white-50">Aktif İstasyon</h6>
-                            <h2 class="fw-bold">@stats.TotalActiveStations</h2>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. Kutucuk: Toplam Soket -->
-            <div class="col-md-4">
-                <div class="card shadow-sm border-0 bg-success text-white p-3">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-plug display-6 me-3"></i>
-                        <div>
-                            <h6 class="mb-0 text-white-50">Toplam Soket</h6>
-                            <h2 class="fw-bold">@stats.TotalSocketCount</h2>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. Kutucuk: Toplam Güç -->
-            <div class="col-md-4">
-                <div class="card shadow-sm border-0 bg-info text-white p-3">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-lightning-charge display-6 me-3"></i>
-                        <div>
-                            <h6 class="mb-0 text-white-50">Toplam Güç (kW)</h6>
-                            <h2 class="fw-bold">@stats.TotalPowerCapacity.ToString("N0")</h2>
-                        </div>
-                    </div>
+    <!-- STAT CARDS -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="stat-card stat-primary">
+                <div class="stat-icon"><i class="bi bi-ev-station"></i></div>
+                <div>
+                    <div class="stat-label">Active Stations</div>
+                    <div class="stat-value">@stats.TotalActiveStations</div>
                 </div>
             </div>
         </div>
 
-        <!-- Şirket Bazlı Özet (Yan Yana Kutucuklar) -->
-        <div class="row mt-4">
-            <div class="col-12 mb-3">
-                <h5 class="fw-bold">⚡ Şirket Bazlı Güç Dağılımı</h5>
-            </div>
-            @* 💡 PowerByCompany listesini TotalPower değerine göre büyükten küçüğe sıralayarak dönüyoruz *@
-            @foreach (var company in stats.PowerByCompany.OrderByDescending(c => c.TotalPower))
-            {
-                <div class="col-md-3 col-sm-6 mb-3">
-                    <div class="card shadow-sm border-0 h-100 p-3 text-center" style="border-left: 4px solid #007bff !important;">
-                        <div class="text-muted small fw-semibold">@company.CompanyName</div>
-                        <div class="fw-bold fs-5 text-primary mt-1">@company.TotalPower.ToString("N0") kW</div>
-                    </div>
+        <div class="col-md-4">
+            <div class="stat-card stat-success">
+                <div class="stat-icon"><i class="bi bi-plug"></i></div>
+                <div>
+                    <div class="stat-label">Total Sockets</div>
+                    <div class="stat-value">@stats.TotalSocketCount</div>
                 </div>
-            }
+            </div>
         </div>
+
+        <div class="col-md-4">
+            <div class="stat-card stat-info">
+                <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
+                <div>
+                    <div class="stat-label">Total Power (kW)</div>
+                    <div class="stat-value">@stats.TotalPowerCapacity.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CORPORATE COMPANY RANKING -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold m-0">⚡ Power Distribution by Company</h5>
+        <span class="text-muted small">@rankedCompanies.Count marka</span>
+    </div>
+
+    <div class="row g-3">
+        @foreach (var company in rankedCompanies)
+        {
+        <div class="col-md-3 col-sm-6">
+            <div class="company-card">
+                @if (company.Rank <= 3)
+                {
+                <div class="rank-badge @GetRankCssClass(company.Rank)">#@company.Rank</div>
+                }
+                <div class="text-muted small fw-semibold text-uppercase">@company.CompanyName</div>
+                <div class="company-power">
+                    @company.TotalPower.ToString("N0") <span class="unit">kW</span>
+                </div>
+                <div class="progress company-progress">
+                    <div class="progress-bar" style="width:@company.SharePercent.ToString("F0")%"></div>
+                </div>
+            </div>
+        </div>
+        }
+    </div>
     }
 </div>
 
-@code {
-    private DashboardStatsDto? stats;
-
-    protected override async Task OnInitializedAsync()
-    {
-        try {
-            stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
-        }
-        catch { /* Hata yönetimi */ }
+<style>
+    .hero-banner {
+        position: relative;
+        background: linear-gradient(135deg, #0d47a1 0%, #1976d2 55%, #00acc1 100%);
+        border-radius: 18px;
+        padding: 48px 40px;
+        overflow: hidden;
+        color: #fff;
+        box-shadow: 0 10px 30px rgba(13,71,161,0.25);
     }
+
+    .hero-overlay { position: relative; z-index: 2; max-width: 640px; }
+
+    .hero-title { font-size: 2.6rem; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.5px; }
+    .hero-subtitle { font-size: 1rem; opacity: 0.9; margin-bottom: 0; }
+
+    .badge-live {
+        background: rgba(255,255,255,0.15);
+        border: 1px solid rgba(255,255,255,0.35);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    .hero-icon {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 11rem;
+        opacity: 0.12;
+        z-index: 1;
+    }
+
+    .stat-card {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        border-radius: 16px;
+        padding: 26px;
+        color: #fff;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        transition: transform 0.2s ease;
+    }
+    .stat-card:hover { transform: translateY(-4px); }
+
+    .stat-primary { background: linear-gradient(135deg, #1e3c72, #2a5298); }
+    .stat-success { background: linear-gradient(135deg, #11998e, #38ef7d); }
+    .stat-info    { background: linear-gradient(135deg, #2193b0, #6dd5ed); }
+
+    .stat-icon { font-size: 2.4rem; opacity: 0.9; }
+    .stat-label { font-size: 0.85rem; opacity: 0.85; font-weight: 500; }
+    .stat-value { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+
+    .company-card {
+        position: relative;
+        background: #fff;
+        border-radius: 14px;
+        padding: 20px;
+        height: 100%;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        border: 1px solid #f0f0f0;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .company-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px rgba(0,0,0,0.1);
+    }
+
+    .rank-badge {
+        position: absolute;
+        top: -10px;
+        right: 12px;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 3px 9px;
+        border-radius: 20px;
+        color: #fff;
+    }
+    .rank-1 { background: linear-gradient(135deg,#f7b733,#fc4a1a); }
+    .rank-2 { background: linear-gradient(135deg,#8e9eab,#3b4351); }
+    .rank-3 { background: linear-gradient(135deg,#cd7f32,#8b5a2b); }
+
+    .company-power { font-size: 1.5rem; font-weight: 800; color: #1976d2; margin: 6px 0 10px; }
+    .company-power .unit { font-size: 0.8rem; font-weight: 500; color: #6c757d; }
+
+    .company-progress { height: 6px; border-radius: 4px; background: #eef1f4; }
+    .company-progress .progress-bar { background: linear-gradient(90deg,#1976d2,#00acc1); border-radius: 4px; }
+</style>
+
+@code {
+private DashboardStatsDto? stats;
+private List<CompanyRankItem> rankedCompanies = new();
+
+protected override async Task OnInitializedAsync()
+{
+try
+{
+stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
+rankedCompanies = BuildRankedCompanies(stats);
+}
+catch { /* Error handling */ }
+}
+
+private List<CompanyRankItem> BuildRankedCompanies(DashboardStatsDto? data)
+{
+var result = new List<CompanyRankItem>();
+if (data?.PowerByCompany == null || !data.PowerByCompany.Any())
+return result;
+
+var sorted = data.PowerByCompany.OrderByDescending(c => c.TotalPower).ToList();
+var maxPower = sorted.Max(c => c.TotalPower);
+
+for (int i = 0; i < sorted.Count; i++)
+{
+result.Add(new CompanyRankItem
+{
+Rank = i + 1,
+CompanyName = sorted[i].CompanyName,
+TotalPower = sorted[i].TotalPower,
+SharePercent = maxPower > 0 ? (sorted[i].TotalPower / maxPower * 100) : 0
+});
+}
+
+return result;
+}
+
+private string GetRankCssClass(int rank) => $"rank-{rank}";
+
+public class CompanyRankItem
+{
+public int Rank { get; set; }
+public string CompanyName { get; set; } = string.Empty;
+public decimal TotalPower { get; set; }
+public decimal SharePercent { get; set; }
+}
 }

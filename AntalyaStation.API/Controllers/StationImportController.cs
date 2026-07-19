@@ -1,40 +1,67 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using AntalyaStation.API.Services;
 using Microsoft.AspNetCore.Authorization;
-namespace AntalyaStation.API.Controllers;
+using AntalyaStation.API.DTOs;
 
-[ApiController]
-[Route("api/[controller]")]
-public class StationImportController : ControllerBase
+namespace AntalyaStation.API.Controllers
 {
-    private readonly IExcelImportService _excelImportService;
-
-    public StationImportController(IExcelImportService excelImportService)
+    [ApiController]
+    [Route("api/[controller]")]
+    public class StationImportController : ControllerBase
     {
-        _excelImportService = excelImportService;
-    }
+        private readonly IExcelImportService _excelImportService;
 
-    [HttpPost("excel")]
-    [Authorize] 
-    public async Task<IActionResult> ImportExcel(IFormFile? file)
-    {
-        // 1. Dosya Kontrolü
-        if (file == null || file.Length == 0)
-            return BadRequest("Lütfen geçerli bir Excel dosyası yükleyin.");
+        public StationImportController(IExcelImportService excelImportService)
+        {
+            _excelImportService = excelImportService;
+        }
 
-        try
+        [HttpPost("excel")]
+        [Authorize]
+        public async Task<IActionResult> ImportExcel(IFormFile? file)
         {
-            // 2. Servisi Çağır
-            var savedCount = await _excelImportService.ImportStationsFromExcelAsync(file);
-            
-            return Ok(new { Message = $"{savedCount} adet istasyon başarıyla MongoDB'ye aktarıldı!" });
+            if (file == null || file.Length == 0)
+                return BadRequest("Lütfen geçerli bir Excel dosyası yükleyin.");
+
+            try
+            {
+                var summary = await _excelImportService.ImportStationsFromExcelAsync(file);
+                return Ok(new { Message = $"{summary.InsertedRows} adet istasyon başarıyla MongoDB'ye aktarıldı!", Summary = summary });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = "İşlem sırasında hata oluştu.", Detail = ex.Message });
+            }
         }
-        catch (Exception ex)
+
+        [HttpGet("batches")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetActiveBatches()
         {
-            // 3. 500 Hatası alırsan buradaki hata mesajı sana sebebini söyleyecek (örn: "NullReference" veya "IndexOutRange")
-            return StatusCode(500, new { Error = "İşlem sırasında hata oluştu.", Detail = ex.Message });
+            var batches = await _excelImportService.GetActiveImportBatchesAsync();
+            return Ok(batches);
         }
-        
+
+        [HttpDelete("purge-by-date")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> PurgeByDate([FromQuery] string date)
+        {
+            if (!DateTime.TryParse(date, out DateTime parsedDate))
+                return BadRequest(new { Message = "Provided date string format could not be verified." });
+
+            var count = await _excelImportService.PurgeStationsByDateAsync(parsedDate);
+            return Ok(new { Message = $"Batch transaction complete. Purged {count} entries from matching date constraint." });
+        }
+
+        [HttpDelete("purge-by-batch/{batchId}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> PurgeByBatch(string batchId)
+        {
+            if (string.IsNullOrEmpty(batchId))
+                return BadRequest(new { Message = "Target batch tracking identifier context cannot be null." });
+
+            var count = await _excelImportService.PurgeStationsByBatchIdAsync(batchId);
+            return Ok(new { Message = $"Batch group drop successful. Cleared {count} nodes matching Token Reference: {batchId}." });
+        }
     }
-    
 }

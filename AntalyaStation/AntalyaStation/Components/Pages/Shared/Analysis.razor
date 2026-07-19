@@ -1,4 +1,320 @@
 ﻿@page "/shared/analysis"
+@using AntalyaStation.API.DTOs
+@using System.Linq
+@using ApexCharts
+@inject HttpClient Http
 
-<h3>📊 Analysis & Charts</h3>
-<p>This section will soon be filled with metric cards, total power capacity, and regional distribution charts!</p>
+<div class="container-fluid mt-4" style="font-size: 13px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold m-0"><i class="bi bi-bar-chart-line-fill text-primary"></i> Advanced Graphical Insights</h3>
+            <p class="text-muted m-0" style="font-size: 12px;">Comprehensive data mapping covering current supply frameworks, structural distributions, and regional loads.</p>
+        </div>
+    </div>
+
+    @if (stats == null)
+    {
+        <div class="text-center py-5 bg-white rounded shadow-sm">
+            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+            <div class="text-muted mt-2" style="font-size: 12px;">Compiling graphical components...</div>
+        </div>
+    }
+    else
+    {
+        <!-- ROW 1: SOCKET TYPE DONUT & BRAND RANKING BAR -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0 p-4 bg-white h-100">
+                    <h5 class="fw-bold mb-1 text-dark">🔌 Socket Current Type Ratio</h5>
+                    <p class="text-muted small mb-3">AC ve hızlı DC şarj soketlerinin dağılımı.</p>
+
+                    @{
+                        var socketTypeData = new List<SocketTypeMetric>
+                        {
+                            new() { Type = "AC Charging", Count = stats.AcSocketCount },
+                            new() { Type = "DC Fast Charging", Count = stats.DcSocketCount }
+                        };
+                    }
+
+                    <div class="d-flex align-items-center justify-content-center" style="min-height: 320px;">
+                        @if (stats.AcSocketCount > 0 || stats.DcSocketCount > 0)
+                        {
+                            <ApexChart TItem="SocketTypeMetric" Options="donutChartOptions" Height="300">
+                                <ApexPointSeries TItem="SocketTypeMetric"
+                                                 Items="socketTypeData"
+                                                 SeriesType="SeriesType.Donut"
+                                                 XValue="@(e => e.Type)"
+                                                 YValue="@(e => e.Count)" />
+                            </ApexChart>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-exclamation-circle fs-3 text-warning"></i>
+                                <div class="mt-2 small fw-semibold">No Socket Data Found</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 p-4 bg-white h-100">
+                    <h5 class="fw-bold mb-1 text-dark">⚡ Operator Capacity Standings</h5>
+                    <p class="text-muted small mb-3">İlk 10 marka toplam kapasiteye göre sıralanır, kalanı "Diğer" altında toplanır.</p>
+
+                    @{
+                        var topCompanies = GetTopCompanies();
+                    }
+
+                    @if (topCompanies.Any())
+                    {
+                        <ApexChart TItem="CompanyPowerDto" Options="brandChartOptions" Height="@GetBrandChartHeight(topCompanies.Count)">
+                            <ApexPointSeries TItem="CompanyPowerDto"
+                                             Items="topCompanies"
+                                             SeriesType="SeriesType.Bar"
+                                             Name="Total Capacity (kW)"
+                                             XValue="@(e => e.CompanyName)"
+                                             YValue="@(e => e.TotalPower)"
+                                             Color="#007bff" />
+                        </ApexChart>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-building-x fs-3 text-danger"></i>
+                            <div class="mt-2 small fw-semibold">No Operator Data Found</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: SERVICE TYPE PIE & ADOPTION RADIAL GAUGE -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0 p-4 bg-white h-100">
+                    <h5 class="fw-bold mb-1 text-dark">🥧 Service Type Breakdown</h5>
+                    <p class="text-muted small mb-3">İstasyonların hizmet tipine göre dağılımı.</p>
+
+                    <div class="d-flex align-items-center justify-content-center" style="min-height: 300px;">
+                        @if (stats.StationsByServiceType != null && stats.StationsByServiceType.Any())
+                        {
+                            <ApexChart TItem="ServiceTypeMetricDto" Options="serviceTypeChartOptions" Height="300">
+                                <ApexPointSeries TItem="ServiceTypeMetricDto"
+                                                 Items="stats.StationsByServiceType"
+                                                 SeriesType="SeriesType.Pie"
+                                                 XValue="@(e => e.ServiceType)"
+                                                 YValue="@(e => e.Count)" />
+                            </ApexChart>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-pie-chart fs-3 text-secondary"></i>
+                                <div class="mt-2 small fw-semibold">No Service Type Data Found</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 p-4 bg-white h-100">
+                    <h5 class="fw-bold mb-1 text-dark">🎯 Green &amp; Smart Charging Adoption</h5>
+                    <p class="text-muted small mb-3">Yeşil şarj ve akıllı şarj özelliğine sahip istasyon oranı.</p>
+
+                    <div class="d-flex align-items-center justify-content-center" style="min-height: 300px;">
+                        <ApexChart TItem="GaugeMetric" Options="radialChartOptions" Height="300">
+                            <ApexPointSeries TItem="GaugeMetric"
+                                             Items="gaugeItems"
+                                             SeriesType="SeriesType.RadialBar"
+                                             XValue="@(e => e.Label)"
+                                             YValue="@(e => e.Value)" />
+                        </ApexChart>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 3: REGIONAL DISTRIBUTION -->
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 p-4 bg-white">
+                    <h5 class="fw-bold mb-1 text-dark">📍 Regional Power Concentration by District</h5>
+                    <p class="text-muted small mb-3">Bölgelere göre güç yükü ve aktif istasyon sayısı.</p>
+
+                    <div style="min-height: 350px;">
+                        @if (stats.PowerByDistrict != null && stats.PowerByDistrict.Any())
+                        {
+                            <ApexChart TItem="DistrictMetricDto" Options="districtChartOptions" Height="350">
+                                <ApexPointSeries TItem="DistrictMetricDto"
+                                                 Items="stats.PowerByDistrict.OrderByDescending(d => d.TotalPower)"
+                                                 SeriesType="SeriesType.Area"
+                                                 Name="Total Power Load (kW)"
+                                                 XValue="@(e => e.DistrictName)"
+                                                 YValue="@(e => e.TotalPower)"
+                                                 Color="#28a745" />
+
+                                <ApexPointSeries TItem="DistrictMetricDto"
+                                                 Items="stats.PowerByDistrict.OrderByDescending(d => d.TotalPower)"
+                                                 SeriesType="SeriesType.Line"
+                                                 Name="Active Charging Stations"
+                                                 XValue="@(e => e.DistrictName)"
+                                                 YValue="@(e => e.StationCount)"
+                                                 Color="#ffc107" />
+                            </ApexChart>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5 text-muted border rounded bg-light-subtle">
+                                <i class="bi bi-map-fill fs-3 text-secondary"></i>
+                                <div class="mt-2 small fw-semibold">No Regional Metrics Found</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 4: MONTHLY GROWTH TREND -->
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 p-4 bg-white">
+                    <h5 class="fw-bold mb-1 text-dark">📈 Monthly Station Growth</h5>
+                    <p class="text-muted small mb-3">Aylara göre yeni eklenen istasyon sayısı (son 12 ay).</p>
+
+                    <div style="min-height: 320px;">
+                        @if (stats.MonthlyGrowth != null && stats.MonthlyGrowth.Any())
+                        {
+                            <ApexChart TItem="MonthlyGrowthDto" Options="growthChartOptions" Height="320">
+                                <ApexPointSeries TItem="MonthlyGrowthDto"
+                                                 Items="stats.MonthlyGrowth"
+                                                 SeriesType="SeriesType.Area"
+                                                 Name="Yeni Eklenen İstasyon"
+                                                 XValue="@(e => e.Month)"
+                                                 YValue="@(e => e.NewStations)"
+                                                 Color="#6f42c1" />
+                            </ApexChart>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5 text-muted border rounded bg-light-subtle">
+                                <i class="bi bi-graph-up fs-3 text-secondary"></i>
+                                <div class="mt-2 small fw-semibold">No Growth Data Found</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardStatsDto? stats;
+    private List<GaugeMetric> gaugeItems = new();
+
+    private ApexChartOptions<SocketTypeMetric> donutChartOptions = new()
+    {
+        Chart = new Chart { Toolbar = new Toolbar { Show = false } },
+        Colors = new List<string> { "#ffc107", "#dc3545" },
+        Legend = new Legend { Position = LegendPosition.Bottom }
+    };
+
+    private ApexChartOptions<CompanyPowerDto> brandChartOptions => new()
+    {
+        Chart = new Chart { Toolbar = new Toolbar { Show = false } },
+        PlotOptions = new PlotOptions
+        {
+            Bar = new PlotOptionsBar { Horizontal = true, BorderRadius = 4, BarHeight = "60%" }
+        },
+        Xaxis = new XAxis { Labels = new XAxisLabels { Style = new AxisLabelStyle { FontSize = "11px" } } },
+        Yaxis = new List<YAxis> { new YAxis { Labels = new YAxisLabels { Style = new AxisLabelStyle { FontSize = "11px", FontWeight = "600" } } } }
+    };
+
+    private ApexChartOptions<ServiceTypeMetricDto> serviceTypeChartOptions = new()
+    {
+        Chart = new Chart { Toolbar = new Toolbar { Show = false } },
+        Colors = new List<string> { "#007bff", "#20c997", "#fd7e14", "#6610f2", "#e83e8c" },
+        Legend = new Legend { Position = LegendPosition.Bottom }
+    };
+
+    private ApexChartOptions<GaugeMetric> radialChartOptions = new()
+    {
+        Chart = new Chart { Toolbar = new Toolbar { Show = false } },
+        Colors = new List<string> { "#28a745", "#17a2b8" },
+        Legend = new Legend { Show = true, Position = LegendPosition.Bottom }
+    };
+
+    private ApexChartOptions<DistrictMetricDto> districtChartOptions = new()
+    {
+        Chart = new Chart { Toolbar = new Toolbar { Show = true } },
+        Stroke = new Stroke { Width = new List<int> { 3, 4 }, Curve = Curve.Smooth },
+        Xaxis = new XAxis { Labels = new XAxisLabels { Rotate = -45, Style = new AxisLabelStyle { FontSize = "11px" } } }
+    };
+
+    private ApexChartOptions<MonthlyGrowthDto> growthChartOptions = new()
+    {
+        Chart = new Chart { Toolbar = new Toolbar { Show = true } },
+        Stroke = new Stroke { Width = new List<int> { 3 }, Curve = Curve.Smooth },
+        Xaxis = new XAxis { Labels = new XAxisLabels { Style = new AxisLabelStyle { FontSize = "11px" } } }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
+
+            if (stats != null)
+            {
+                var greenPct = stats.TotalActiveStations > 0
+                    ? Math.Round((decimal)stats.GreenChargingCount / stats.TotalActiveStations * 100, 1)
+                    : 0;
+                var smartPct = stats.TotalActiveStations > 0
+                    ? Math.Round((decimal)stats.SmartChargingCount / stats.TotalActiveStations * 100, 1)
+                    : 0;
+
+                gaugeItems = new List<GaugeMetric>
+                {
+                    new() { Label = "Green Charging %", Value = greenPct },
+                    new() { Label = "Smart Charging %", Value = smartPct }
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error mapping API dashboard metrics: {ex.Message}");
+        }
+    }
+
+    // 🟢 Okunabilirlik için ilk 10 marka + kalanı "Diğer" olarak grupla
+    private List<CompanyPowerDto> GetTopCompanies()
+    {
+        if (stats?.PowerByCompany == null || !stats.PowerByCompany.Any())
+            return new();
+
+        var sorted = stats.PowerByCompany.OrderByDescending(c => c.TotalPower).ToList();
+        if (sorted.Count <= 10) return sorted;
+
+        var top = sorted.Take(10).ToList();
+        var rest = sorted.Skip(10).Sum(c => c.TotalPower);
+        top.Add(new CompanyPowerDto { CompanyName = $"Diğer ({sorted.Count - 10} marka)", TotalPower = rest });
+        return top;
+    }
+
+    private int GetBrandChartHeight(int itemCount) => Math.Max(360, itemCount * 40);
+
+    public class SocketTypeMetric
+    {
+        public string Type { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+
+    public class GaugeMetric
+    {
+        public string Label { get; set; } = string.Empty;
+        public decimal  Value { get; set; }
+    }
+}

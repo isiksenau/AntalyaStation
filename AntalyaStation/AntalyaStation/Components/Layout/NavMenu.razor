@@ -14,29 +14,30 @@
         <!-- 🏠 Home -->
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Genel Bakış
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Overview
             </NavLink>
         </div>
 
-        <!-- 📊 Grafik Paneli -->
+        <!-- 📊 Analytics -->
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="shared/analysis">
-                <span class="bi bi-bar-chart-line-fill-nav-menu" aria-hidden="true"></span> Grafik Paneli
-            </NavLink>
-        </div>
-        <!-- 📋 Veri Görüntüleme -->
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="view-data">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Veri Görüntüleme
+                <span class="bi bi-bar-chart-line-fill-nav-menu" aria-hidden="true"></span> Analytics
             </NavLink>
         </div>
 
-        <!-- 🗂️ Veri Operasyonları (Admin Only, Grup) -->
+        <!-- 📋 View Data -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="view-data">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> View Data
+            </NavLink>
+        </div>
+
+        <!-- 🗂️ Data Operations (Admin Only, Group) -->
         <AuthorizeView Roles="Admin">
             <Authorized>
                 <div class="nav-item px-3">
                     <div class="nav-link custom-dropdown-toggle" @onclick="ToggleDataOps" style="cursor: pointer;">
-                        <span class="bi bi-database-fill-gear-nav-menu" aria-hidden="true"></span> Veri Operasyonları
+                        <span class="bi bi-database-fill-gear-nav-menu" aria-hidden="true"></span> Data Operations
                         <span class="ms-auto bi @(isDataOpsOpen ? "bi-chevron-up" : "bi-chevron-down")"></span>
                     </div>
 
@@ -44,10 +45,10 @@
                     {
                         <div class="submenu-container ps-4">
                             <NavLink class="nav-link submenu-link" href="admin/excel-upload">
-                                <span class="bi bi-file-earmark-arrow-up-fill-nav-menu" aria-hidden="true"></span> Excel Yükleme
+                                <span class="bi bi-file-earmark-arrow-up-fill-nav-menu" aria-hidden="true"></span> Excel Upload
                             </NavLink>
                             <NavLink class="nav-link submenu-link" href="admin/add-data">
-                                <span class="bi bi-plus-circle-fill-nav-menu" aria-hidden="true"></span> Manuel Veri Ekleme
+                                <span class="bi bi-plus-circle-fill-nav-menu" aria-hidden="true"></span> Manual Data Entry
                             </NavLink>
                         </div>
                     }
@@ -55,19 +56,19 @@
             </Authorized>
         </AuthorizeView>
 
-        <!-- 🗺️ Haritalar -->
+        <!-- 🗺️ Maps -->
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="map">
-                <span class="bi bi-map-fill-nav-menu" aria-hidden="true"></span> Haritalar
+                <span class="bi bi-map-fill-nav-menu" aria-hidden="true"></span> Maps
             </NavLink>
         </div>
 
-        <!-- 👑 Admin Yönetimi (Admin Only, Grup) -->
+        <!-- 👑 Admin Management (Admin Only, Group) -->
         <AuthorizeView Roles="Admin">
             <Authorized>
                 <div class="nav-item px-3">
                     <div class="nav-link custom-dropdown-toggle" @onclick="ToggleAdmin" style="cursor: pointer;">
-                        <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> Admin Yönetimi
+                        <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> Admin Management
                         <span class="ms-auto bi @(isAdminOpen ? "bi-chevron-up" : "bi-chevron-down")"></span>
                     </div>
 
@@ -75,13 +76,13 @@
                     {
                         <div class="submenu-container ps-4">
                             <NavLink class="nav-link submenu-link" href="admin/control-panel">
-                                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Sistem Konsolu
+                                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> System Console
                             </NavLink>
                             <NavLink class="nav-link submenu-link" href="admin/permissions">
-                                <span class="bi bi-key-fill-nav-menu" aria-hidden="true"></span> Admin Yetki Yönetimi
+                                <span class="bi bi-key-fill-nav-menu" aria-hidden="true"></span> Admin Permissions
                             </NavLink>
                             <NavLink class="nav-link submenu-link" href="user-management">
-                                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> Kullanıcı Yönetimi
+                                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> User Management
                             </NavLink>
                         </div>
                     }
@@ -89,10 +90,10 @@
             </Authorized>
         </AuthorizeView>
 
-        <!-- ⚙️ Profil & Ayarlar (Grup) -->
+        <!-- ⚙️ Profile & Settings (Group) -->
         <div class="nav-item px-3">
             <div class="nav-link custom-dropdown-toggle" @onclick="ToggleSettings" style="cursor: pointer;">
-                <span class="bi bi-person-circle" aria-hidden="true"></span> Profil & Ayarlar
+                <span class="bi bi-person-circle" aria-hidden="true"></span> Profile & Settings
                 <span class="ms-auto bi @(isSettingsOpen ? "bi-chevron-up" : "bi-chevron-down")"></span>
             </div>
 
@@ -100,10 +101,10 @@
             {
                 <div class="submenu-container ps-4">
                     <NavLink class="nav-link submenu-link" href="profile/my-info">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Bilgilerim
+                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> My Info
                     </NavLink>
                     <NavLink class="nav-link submenu-link" href="profile/change-password">
-                        <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> Şifre Değiştir
+                        <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> Change Password
                     </NavLink>
                 </div>
             }
@@ -113,11 +114,10 @@
 </div>
 
 @code {
-    
     private bool isDataOpsOpen = false;
     private bool isAdminOpen = false;
     private bool isSettingsOpen = false;
-    
+
     private void ToggleDataOps() => isDataOpsOpen = !isDataOpsOpen;
     private void ToggleAdmin() => isAdminOpen = !isAdminOpen;
     private void ToggleSettings() => isSettingsOpen = !isSettingsOpen;

@@ -1,12 +1,13 @@
-﻿// HTTP üzerinden gelen dosya yükleme (IFormFile) yeteneklerini kullanmak için ekledik.
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
+using AntalyaStation.API.DTOs;
 
-// Dosyanın projedeki tam konumunu (klasör yolunu) belirtir.
-namespace AntalyaStation.API.Services;
-
-// Dışarıya sadece metotların imzasını (adını ve ne beklediğini) sunan arayüzümüz.
-public interface IExcelImportService
+namespace AntalyaStation.API.Services
 {
-    // Excel dosyasını alıp, arka planda işleyip, kaydedilen istasyon sayısını (int) dönen asenkron metot.
-    Task<int> ImportStationsFromExcelAsync(IFormFile file);
+    public interface IExcelImportService
+    {
+        Task<ImportSummaryDto> ImportStationsFromExcelAsync(IFormFile file);
+        Task<Dictionary<string, int>> GetActiveImportBatchesAsync();
+        Task<int> PurgeStationsByDateAsync(DateTime targetDate);
+        Task<int> PurgeStationsByBatchIdAsync(string batchId);
+    }
 }

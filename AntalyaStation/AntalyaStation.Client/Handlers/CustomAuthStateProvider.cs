@@ -1,6 +1,11 @@
-﻿using System.Net.Http.Headers;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 
@@ -27,9 +32,6 @@ namespace AntalyaStation.Client.Handlers
             }
             catch (InvalidOperationException)
             {
-                // Statik prerender aşamasındayız, JS interop henüz mümkün değil.
-                // Anonim state döndürüyoruz; interaktif hale geçince bu metod
-                // tekrar çağrılıp gerçek token okunacak.
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
 
@@ -38,15 +40,33 @@ namespace AntalyaStation.Client.Handlers
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
 
+            var claims = ParseClaimsFromJwt(token);
+
+            // Token'ın süresi dolmuşsa geçersiz say ve temizle
+            var expClaim = claims.FirstOrDefault(c => c.Type == "exp");
+            if (expClaim != null && long.TryParse(expClaim.Value, out var expUnix))
+            {
+                var expiry = DateTimeOffset.FromUnixTimeSeconds(expUnix);
+                if (expiry < DateTimeOffset.UtcNow)
+                {
+                    await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                }
+            }
+
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt")));
+            // Parametresiz ClaimsIdentity kullanarak tüm JWT claim'lerinin (role vb.) okunmasını sağlıyoruz
+            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt")));
         }
 
         public async Task MarkUserAsAuthenticated(string token)
         {
             await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", token);
-            var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
+            
+            var claims = ParseClaimsFromJwt(token);
+            var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
+            
             var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
             NotifyAuthenticationStateChanged(authState);
         }
