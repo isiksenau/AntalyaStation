@@ -80,12 +80,6 @@ namespace AntalyaStation.API.Repositories
                     Builders<Socket>.Filter.Regex(sock => sock.Type, new BsonRegularExpression(filter.StationType, "i")));
             }
 
-            if (filter.IsGreenCharging.HasValue)
-                filterDefinition &= builder.Eq(s => s.IsGreenCharging, filter.IsGreenCharging.Value);
-
-            if (filter.IsSmartCharging.HasValue)
-                filterDefinition &= builder.Eq(s => s.IsSmartCharging, filter.IsSmartCharging.Value);
-
             var totalCount = (int)await _stations.CountDocumentsAsync(filterDefinition);
             var data = await _stations.Find(filterDefinition)
                 .Skip((pageNumber - 1) * pageSize)

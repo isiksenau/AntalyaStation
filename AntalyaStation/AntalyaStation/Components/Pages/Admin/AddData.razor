@@ -119,7 +119,7 @@
                             <label class="form-label d-block mb-1">Address</label>
                             <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="currentStation.Address"></InputTextArea>
                         </div>
-
+                        <!--
                         <div class="d-flex gap-3 mb-3 py-1 justify-content-start align-items-center">
                             <div class="form-check form-switch m-0">
                                 <InputCheckbox class="form-check-input" id="greenCheck" @bind-Value="currentStation.IsGreenCharging" />
@@ -130,7 +130,7 @@
                                 <label class="form-check-label small fw-semibold text-info" for="smartCheck">💡 Smart</label>
                             </div>
                         </div>
-
+-->
                         <!-- SOCKETS AREA -->
                         <div class="border rounded p-2 mb-3 bg-light-subtle">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -383,8 +383,8 @@
             Address = s.Address,
             City = s.City,
             District = s.District, // 💡 Frontend burayı doğru eşliyor
-            IsGreenCharging = s.IsGreenCharging,
-            IsSmartCharging = s.IsSmartCharging,
+            /*IsGreenCharging = s.IsGreenCharging,
+            IsSmartCharging = s.IsSmartCharging,*/
             AddedDate = s.AddedDate,
             Sockets = s.Sockets != null
                 ? s.Sockets.Select(x => new SocketDto { SocketNumber = x.SocketNumber, Type = x.Type, Power = x.Power }).ToList()

@@ -52,9 +52,11 @@ public class AuthController : ControllerBase
 
         return Ok(new UserProfileDto
         {
+            Id = user.Id!,
             Username = user.Username,
             FullName = user.FullName,
             Email = user.Email,
+            PhoneNumber = user.PhoneNumber,
             Role = user.Role,
             CreatedDate = user.CreatedDate
         });
@@ -70,10 +72,24 @@ public class AuthController : ControllerBase
         var user = await _userRepository.GetByUsernameAsync(username);
         if (user == null) return NotFound(new { Message = "User not found." });
 
-        var updated = await _userRepository.UpdateProfileAsync(user.Id!, dto.FullName, dto.Email);
+        if (string.IsNullOrWhiteSpace(dto.Username))
+            return BadRequest(new { Message = "Username cannot be empty." });
+
+        // 🟢 Kullanıcı adı değiştiriliyorsa, başka biri tarafından alınmış mı kontrol et
+        if (!string.Equals(dto.Username, user.Username, StringComparison.OrdinalIgnoreCase))
+        {
+            var taken = await _userRepository.IsUsernameTakenAsync(dto.Username, user.Id);
+            if (taken)
+                return BadRequest(new { Message = "This username is already taken." });
+        }
+
+        var updated = await _userRepository.UpdateProfileAsync(user.Id!, dto.Username, dto.FullName, dto.Email, dto.PhoneNumber);
         if (!updated) return StatusCode(500, new { Message = "Profile could not be updated." });
 
-        return Ok(new { Message = "Profile updated successfully." });
+        // 🟢 Kullanıcı adı değiştiyse yeni bir token üretmemiz lazım — eski token artık geçersiz kullanıcı adını taşıyor
+        var newToken = GenerateJwtToken(dto.Username, user.Role, user.Id!);
+
+        return Ok(new { Message = "Profile updated successfully.", Token = newToken });
     }
 
     [HttpPost("change-password")]

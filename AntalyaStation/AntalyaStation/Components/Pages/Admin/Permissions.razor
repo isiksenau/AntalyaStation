@@ -1,0 +1,364 @@
+﻿@page "/admin/permissions"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Net.Http.Json
+@using AntalyaStation.API.DTOs
+@using Microsoft.AspNetCore.Authorization
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
+
+<style>
+    .pm-header {
+        background: linear-gradient(135deg, #4a148c 0%, #6a1b9a 60%, #8e24aa 100%);
+        border-radius: 16px;
+        padding: 28px 32px;
+        color: #fff;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(74,20,140,0.25);
+    }
+    .pm-header h3 { font-weight: 800; margin-bottom: 4px; }
+    .pm-header p { opacity: 0.9; margin-bottom: 0; font-size: 14px; }
+
+    .pm-card { border-radius: 14px; border: none; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+
+    .pm-user-item {
+        padding: 12px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        border: 1px solid transparent;
+    }
+    .pm-user-item:hover { background: #f5f2fa; }
+    .pm-user-item.active { background: #ede4f7; border-color: #8e24aa; }
+
+    .pm-group-title {
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6a1b9a;
+        margin-top: 18px;
+        margin-bottom: 8px;
+    }
+
+    .pm-perm-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #eee;
+        margin-bottom: 8px;
+        transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .pm-perm-row.checked { border-color: #8e24aa; background: #faf7fc; }
+    .pm-perm-row .form-check-input { margin-top: 3px; }
+    .pm-perm-label { font-weight: 700; font-size: 13px; color: #2b2b2b; }
+    .pm-perm-desc { font-size: 11.5px; color: #888; }
+
+    .default-badge {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: #eee;
+        color: #777;
+        margin-left: 6px;
+    }
+</style>
+
+<div class="container-fluid mt-3" style="font-size: 13px;">
+
+    <div class="pm-header">
+        <h3><i class="bi bi-key-fill"></i> Admin Permissions</h3>
+        <p>Assign granular access rights per user, or apply the default permission template for their role.</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- USER LIST -->
+        <div class="col-lg-3">
+            <div class="card pm-card p-3">
+                <h6 class="fw-bold text-dark mb-3">Users</h6>
+                @if (_isLoadingUsers)
+                {
+                <div class="text-center text-muted py-4">
+                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                </div>
+                }
+                else
+                {
+                @foreach (var u in _users)
+                {
+                <div class="pm-user-item @(_selectedUser?.UserId == u.UserId ? "active" : "")"
+                     @onclick="() => SelectUser(u)">
+                    <div class="fw-semibold text-dark">@u.Username</div>
+                    <div class="text-muted" style="font-size: 11px;">
+                        @u.Role · @u.Permissions.Count permission(s)
+                    </div>
+                </div>
+                }
+                }
+            </div>
+        </div>
+
+        <!-- PERMISSION EDITOR -->
+        <div class="col-lg-9">
+            @if (_selectedUser == null)
+            {
+            <div class="card pm-card p-5 text-center text-muted">
+                <i class="bi bi-hand-index-thumb fs-2 mb-2"></i>
+                <div>Select a user from the list to manage their permissions.</div>
+            </div>
+            }
+            else
+            {
+            <div class="card pm-card p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+                    <div>
+                        <h5 class="fw-bold m-0 text-dark">@_selectedUser.Username</h5>
+                        <span class="text-muted small">Role: @_selectedUser.Role</span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ApplyDefault" disabled="@_isSaving">
+                            <i class="bi bi-arrow-counterclockwise"></i> Apply Default (@_selectedUser.Role)
+                        </button>
+                        <button class="btn btn-sm btn-primary fw-semibold" @onclick="SavePermissions" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="bi bi-check-circle"></i> Save Changes
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 🟢 Genel / varsayılan şablon bilgisi -->
+                <div class="alert alert-light border small mb-3">
+                    <strong>Default template for {@_selectedUser.Role}:</strong>
+                    @{
+                    var defaultSet = _selectedUser.Role == "Admin" ? _defaultAdminPermissions : _defaultUserPermissions;
+                    }
+                    @if (defaultSet.Any())
+                    {
+                    @string.Join(", ", defaultSet.Select(k => _catalog.FirstOrDefault(p => p.Key == k)?.Label ?? k))
+                    }
+                    else
+                    {
+                    <span class="text-muted">None</span>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(_feedback))
+                {
+                <div class="alert @(_feedbackIsError ? "alert-danger" : "alert-success") py-2 small">@_feedback</div>
+                }
+
+                @foreach (var group in _catalog.GroupBy(p => p.Group))
+                {
+                <div class="pm-group-title">@group.Key</div>
+                @foreach (var perm in group)
+                {
+                var isChecked = _workingPermissions.Contains(perm.Key);
+                var isDefault = defaultSet.Contains(perm.Key);
+
+                <div class="pm-perm-row @(isChecked ? "checked" : "")">
+                    <input type="checkbox" class="form-check-input mt-1"
+                           checked="@isChecked"
+                           @onchange="(e) => TogglePermission(perm.Key, (bool)(e.Value ?? false))" />
+                    <div>
+                        <div class="pm-perm-label">
+                            @perm.Label
+                            @if (isDefault)
+                            {
+                            <span class="default-badge">default</span>
+                            }
+                        </div>
+                        <div class="pm-perm-desc">@perm.Description</div>
+                    </div>
+                </div>
+                }
+                }
+            </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+private List<UserPermissionsDto> _users = new();
+private UserPermissionsDto? _selectedUser;
+private List<string> _workingPermissions = new();
+
+private List<PermissionDefinitionDto> _catalog = new();
+private List<string> _defaultUserPermissions = new();
+private List<string> _defaultAdminPermissions = new();
+
+private bool _isLoadingUsers = true;
+private bool _isSaving = false;
+private string _feedback = "";
+private bool _feedbackIsError = false;
+
+protected override async Task OnInitializedAsync()
+{
+await EnforceAuthHeader();
+await LoadCatalog();
+await LoadUsers();
+}
+
+private async Task EnforceAuthHeader()
+{
+try
+{
+var token = await JsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+if (!string.IsNullOrEmpty(token))
+{
+Http.DefaultRequestHeaders.Authorization =
+new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+}
+}
+catch { }
+}
+
+private async Task LoadCatalog()
+{
+try
+{
+var result = await Http.GetFromJsonAsync<PermissionCatalogResponseDto>("api/permissions/catalog");
+if (result != null)
+{
+_catalog = result.AllPermissions;
+_defaultUserPermissions = result.DefaultUserPermissions;
+_defaultAdminPermissions = result.DefaultAdminPermissions;
+}
+}
+catch (Exception ex)
+{
+_feedback = $"Failed to load permission catalog: {ex.Message}";
+_feedbackIsError = true;
+}
+}
+
+private async Task LoadUsers()
+{
+_isLoadingUsers = true;
+try
+{
+await EnforceAuthHeader();
+var result = await Http.GetFromJsonAsync<List<UserPermissionsDto>>("api/permissions/users");
+_users = result ?? new List<UserPermissionsDto>();
+}
+catch (Exception ex)
+{
+_feedback = $"Failed to load users: {ex.Message}";
+_feedbackIsError = true;
+}
+finally
+{
+_isLoadingUsers = false;
+}
+}
+
+private void SelectUser(UserPermissionsDto user)
+{
+_selectedUser = user;
+_workingPermissions = new List<string>(user.Permissions);
+_feedback = "";
+}
+
+private void TogglePermission(string key, bool isChecked)
+{
+if (isChecked && !_workingPermissions.Contains(key))
+{
+_workingPermissions.Add(key);
+}
+else if (!isChecked && _workingPermissions.Contains(key))
+{
+_workingPermissions.Remove(key);
+}
+}
+
+private async Task SavePermissions()
+{
+if (_selectedUser == null) return;
+
+_isSaving = true;
+_feedback = "";
+
+try
+{
+await EnforceAuthHeader();
+
+var response = await Http.PutAsJsonAsync(
+$"api/permissions/users/{_selectedUser.UserId}",
+new UpdateUserPermissionsDto { Permissions = _workingPermissions });
+
+if (response.IsSuccessStatusCode)
+{
+_selectedUser.Permissions = new List<string>(_workingPermissions);
+var listItem = _users.FirstOrDefault(u => u.UserId == _selectedUser.UserId);
+if (listItem != null) listItem.Permissions = new List<string>(_workingPermissions);
+
+_feedback = "Permissions saved successfully.";
+_feedbackIsError = false;
+}
+else
+{
+var rawError = await response.Content.ReadAsStringAsync();
+_feedback = $"Save failed: {rawError}";
+_feedbackIsError = true;
+}
+}
+catch (Exception ex)
+{
+_feedback = $"Save error: {ex.Message}";
+_feedbackIsError = true;
+}
+finally
+{
+_isSaving = false;
+}
+}
+
+private async Task ApplyDefault()
+{
+if (_selectedUser == null) return;
+
+_isSaving = true;
+_feedback = "";
+
+try
+{
+await EnforceAuthHeader();
+
+var response = await Http.PostAsync($"api/permissions/users/{_selectedUser.UserId}/apply-default", null);
+
+if (response.IsSuccessStatusCode)
+{
+var defaultSet = _selectedUser.Role == "Admin" ? _defaultAdminPermissions : _defaultUserPermissions;
+_workingPermissions = new List<string>(defaultSet);
+_selectedUser.Permissions = new List<string>(defaultSet);
+
+var listItem = _users.FirstOrDefault(u => u.UserId == _selectedUser.UserId);
+if (listItem != null) listItem.Permissions = new List<string>(defaultSet);
+
+_feedback = "Default permission template applied.";
+_feedbackIsError = false;
+}
+else
+{
+var rawError = await response.Content.ReadAsStringAsync();
+_feedback = $"Apply default failed: {rawError}";
+_feedbackIsError = true;
+}
+}
+catch (Exception ex)
+{
+_feedback = $"Apply default error: {ex.Message}";
+_feedbackIsError = true;
+}
+finally
+{
+_isSaving = false;
+}
+}
+}

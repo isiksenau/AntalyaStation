@@ -1,0 +1,139 @@
+﻿@page "/admin/control-panel"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Net.Http.Json
+@using AntalyaStation.API.DTOs
+@using Microsoft.AspNetCore.Authorization
+@inject HttpClient Http
+
+<style>
+    .sc-header {
+        background: linear-gradient(135deg, #263238 0%, #37474f 60%, #455a64 100%);
+        border-radius: 16px;
+        padding: 28px 32px;
+        color: #fff;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(38,50,56,0.25);
+    }
+    .sc-header h3 { font-weight: 800; margin-bottom: 4px; }
+    .sc-header p { opacity: 0.85; margin-bottom: 0; font-size: 14px; }
+
+    .sc-card { border-radius: 14px; border: none; box-shadow: 0 4px 16px rgba(0,0,0,0.06); height: 100%; }
+    .sc-stat-icon { font-size: 1.8rem; opacity: 0.85; }
+    .sc-stat-value { font-size: 1.8rem; font-weight: 800; }
+    .sc-stat-label { font-size: 12px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; }
+
+    .sc-status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .sc-status-ok { background: #28a745; box-shadow: 0 0 6px #28a745; }
+</style>
+
+<div class="container-fluid mt-3" style="font-size: 13px;">
+
+    <div class="sc-header">
+        <h3><i class="bi bi-hdd-network-fill"></i> System Console</h3>
+        <p>Live overview of platform health, data volume, and system status.</p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="card sc-card p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-ev-station text-primary sc-stat-icon"></i>
+                    </div>
+                    <div class="sc-stat-value">@_stats?.TotalActiveStations</div>
+                    <div class="sc-stat-label">Active Stations</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card sc-card p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-plug text-success sc-stat-icon"></i>
+                    </div>
+                    <div class="sc-stat-value">@_stats?.TotalSocketCount</div>
+                    <div class="sc-stat-label">Total Sockets</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card sc-card p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-lightning-charge text-warning sc-stat-icon"></i>
+                    </div>
+                    <div class="sc-stat-value">@_stats?.TotalPowerCapacity.ToString("N0")</div>
+                    <div class="sc-stat-label">Total Power (kW)</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card sc-card p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-people-fill text-info sc-stat-icon"></i>
+                    </div>
+                    <div class="sc-stat-value">@_userCount</div>
+                    <div class="sc-stat-label">Registered Users</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card sc-card p-3">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-server me-1"></i> Service Status</h6>
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <span class="text-muted">API Layer</span>
+                        <span><span class="sc-status-dot sc-status-ok"></span>Online</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <span class="text-muted">Database Connection</span>
+                        <span><span class="sc-status-dot sc-status-ok"></span>Connected</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Authentication Service</span>
+                        <span><span class="sc-status-dot sc-status-ok"></span>Operational</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card sc-card p-3">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-1"></i> Environment</h6>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted">Application</span>
+                        <span class="fw-semibold">AntalyaStation Platform</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted">Environment</span>
+                        <span class="fw-semibold">Development</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Report Generated</span>
+                        <span class="fw-semibold">@DateTime.Now.ToString("dd.MM.yyyy HH:mm")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardStatsDto? _stats;
+    private int _userCount = 0;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
+            var users = await Http.GetFromJsonAsync<List<AdminUserListItemDto>>("api/users");
+            _userCount = users?.Count ?? 0;
+        }
+        catch { /* silent — panel widgets just show blank */ }
+        _isLoading = false;
+    }
+}

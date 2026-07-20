@@ -74,4 +74,32 @@ public class AuthService : IAuthService
 
         return CryptographicOperations.FixedTimeEquals(computedHash, expectedHash);
     }
+    public async Task<(bool Success, string? Error, User? User)> CreateUserAsync(
+        string username, string password, string fullName, string email, string role)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            return (false, "Username and password are required.", null);
+
+        if (password.Length < 6)
+            return (false, "Password must be at least 6 characters long.", null);
+
+        var existing = await _userRepository.GetByUsernameAsync(username);
+        if (existing != null)
+            return (false, "A user with this username already exists.", null);
+
+        var (hash, salt) = HashPassword(password);
+        var user = new User
+        {
+            Username = username,
+            FullName = fullName,
+            Email = email,
+            Role = string.IsNullOrWhiteSpace(role) ? "User" : role,
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            CreatedDate = DateTime.UtcNow
+        };
+
+        await _userRepository.AddAsync(user);
+        return (true, null, user);
+    }
 }

@@ -1,4 +1,545 @@
 ﻿@page "/map"
+@using System.Net.Http.Json
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
+@implements IAsyncDisposable
 
-<h3>🗺️ Antalya Charging Stations Map</h3>
-<p>Interactive geographic visualization of all active stations across Antalya.</p>
+<style>
+    .map-page {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 3.5rem);
+        overflow: hidden;
+    }
+
+    .map-canvas {
+        width: 100%;
+        height: 100%;
+        background: #e5e3df;
+    }
+
+    /* ===== Circular overlay buttons ===== */
+    .map-overlay-top-left, .map-overlay-top-right {
+        position: absolute;
+        top: 16px;
+        z-index: 500;
+        display: flex;
+        gap: 10px;
+    }
+    .map-overlay-top-left { left: 16px; }
+    .map-overlay-top-right { right: 16px; }
+
+    .map-btn {
+        position: relative;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: #0d1b2a;
+        color: #fff;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        cursor: pointer;
+        transition: transform 0.15s ease, background 0.2s ease;
+    }
+    .map-btn:hover { transform: translateY(-1px); }
+    .map-btn:active { transform: translateY(0); }
+    .map-btn-active { background: #ff4d00; }
+
+    .map-btn-label {
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+    }
+
+    .map-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #ff4d00;
+        color: #fff;
+        font-size: 0.62rem;
+        font-weight: 700;
+        min-width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 3px;
+        border: 2px solid #fff;
+    }
+
+    /* ===== Station markers (rendered via JS, styled here) ===== */
+    :global(.station-pin) {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(45deg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+        border: 2px solid #fff;
+    }
+    :global(.station-pin span) {
+        transform: rotate(-45deg);
+        color: #fff;
+        font-size: 0.6rem;
+        font-weight: 800;
+    }
+    :global(.status-dot) {
+        position: absolute;
+        top: -3px;
+        right: -3px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+    }
+
+    /* ===== Nearby stations panel ===== */
+    .map-nearby-panel {
+        position: absolute;
+        top: 76px;
+        right: 16px;
+        width: 300px;
+        max-height: 60vh;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+        z-index: 500;
+    }
+    .map-nearby-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        font-weight: 700;
+        font-size: 14px;
+        border-bottom: 1px solid #f1f3f5;
+        position: sticky;
+        top: 0;
+        background: #fff;
+        border-radius: 14px 14px 0 0;
+    }
+    .map-panel-close {
+        border: none;
+        background: none;
+        color: #adb5bd;
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+    .map-nearby-empty {
+        padding: 20px 16px;
+        font-size: 13px;
+        color: #6c757d;
+        text-align: center;
+    }
+    .map-nearby-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid #f8f9fa;
+        transition: background 0.15s ease;
+    }
+    .map-nearby-item:hover { background: #f8f9fb; }
+    .map-nearby-brand {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        color: #fff;
+        font-size: 0.62rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .map-nearby-info { flex: 1; min-width: 0; }
+    .map-nearby-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #212529;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .map-nearby-sub {
+        font-size: 11.5px;
+        color: #8a939c;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .map-nearby-distance {
+        font-size: 12px;
+        font-weight: 700;
+        color: #1976d2;
+        flex-shrink: 0;
+    }
+
+    /* ===== Selected station detail card ===== */
+    .map-detail-card {
+        position: absolute;
+        left: 16px;
+        bottom: 16px;
+        width: 320px;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        padding: 16px;
+        display: flex;
+        gap: 12px;
+        z-index: 500;
+    }
+    .map-detail-close {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+    }
+    .map-detail-brand {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        color: #fff;
+        font-weight: 800;
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .map-detail-name { font-weight: 700; font-size: 14px; color: #212529; }
+    .map-detail-sub { font-size: 12px; color: #8a939c; margin-top: 2px; margin-bottom: 8px; }
+    .map-detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .map-tag {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #eef2f6;
+        color: #495057;
+    }
+    .map-tag-power { background: #fff4e6; color: #d9720a; }
+</style>
+
+<div class="map-page">
+    <div id="station-map" class="map-canvas"></div>
+
+    <!-- Top-left: dark mode + locate me -->
+    <div class="map-overlay-top-left">
+        <button class="map-btn @(isDarkMode ? "map-btn-active" : "")" @onclick="ToggleDarkMode" title="Toggle dark mode">
+            <i class="bi bi-globe2"></i>
+        </button>
+        <button class="map-btn" @onclick="LocateMe" title="Show my location">
+            <i class="bi bi-geo-alt-fill"></i>
+        </button>
+    </div>
+
+    <!-- Top-right: AC/DC filter + nearby stations -->
+    <div class="map-overlay-top-right">
+        <button class="map-btn @(currentFilter != "All" ? "map-btn-active" : "")" @onclick="CycleAcDcFilter" title="Filter by AC / DC">
+            <span class="map-btn-label">@currentFilter</span>
+        </button>
+        <button class="map-btn" @onclick="ToggleNearbyPanel" title="Nearby stations">
+            <i class="bi bi-lightning-charge-fill"></i>
+            @if (nearbyStations.Any())
+            {
+                <span class="map-badge">@nearbyStations.Count</span>
+            }
+        </button>
+    </div>
+
+    <!-- Nearby stations panel -->
+    @if (showNearbyPanel)
+    {
+        <div class="map-nearby-panel">
+            <div class="map-nearby-header">
+                <span>Nearby Stations</span>
+                <button class="map-panel-close" @onclick="ToggleNearbyPanel"><i class="bi bi-x-lg"></i></button>
+            </div>
+
+            @if (isLocating)
+            {
+                <div class="map-nearby-empty"><span class="spinner-border spinner-border-sm me-2"></span> Finding your location...</div>
+            }
+            else if (!nearbyStations.Any())
+            {
+                <div class="map-nearby-empty">Tap the location button on the top left so we can find stations near you.</div>
+            }
+            else
+            {
+                @foreach (var item in nearbyStations)
+                {
+                    <div class="map-nearby-item" @onclick="() => FlyToStation(item.Station)">
+                        <div class="map-nearby-brand" style="background:@GetBrandColor(item.Station.Brand)">
+                            @GetBrandInitials(item.Station.Brand)
+                        </div>
+                        <div class="map-nearby-info">
+                            <div class="map-nearby-name">@item.Station.StationName</div>
+                            <div class="map-nearby-sub">@item.Station.Brand &middot; @item.Station.District</div>
+                        </div>
+                        <div class="map-nearby-distance">@item.DistanceKm.ToString("0.0") km</div>
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    <!-- Selected station detail card -->
+    @if (selectedStation != null)
+    {
+        <div class="map-detail-card">
+            <button class="map-panel-close map-detail-close" @onclick="() => selectedStation = null"><i class="bi bi-x-lg"></i></button>
+            <div class="map-detail-brand" style="background:@GetBrandColor(selectedStation.Brand)">
+                @GetBrandInitials(selectedStation.Brand)
+            </div>
+            <div>
+                <div class="map-detail-name">@selectedStation.StationName</div>
+                <div class="map-detail-sub">@selectedStation.Brand &middot; @selectedStation.Address</div>
+                <div class="map-detail-tags">
+                    @foreach (var t in GetSocketTypes(selectedStation))
+                    {
+                        <span class="map-tag">@t</span>
+                    }
+                    <span class="map-tag map-tag-power">@selectedStation.TotalPower.ToString("0") kW</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // Antalya merkez koordinatı — istasyon verisi yoksa haritanın başlangıç görünümü
+    private const double DefaultLat = 36.8969;
+    private const double DefaultLng = 30.7133;
+
+    private static readonly string[] Palette =
+    {
+        "#ff4d00", "#0057ff", "#00a651", "#7b2ff7", "#009688",
+        "#e91e63", "#ff9800", "#3f51b5", "#795548", "#607d8b"
+    };
+
+    private List<MapStationDto> allStations = new();
+    private List<MapStationDto> visibleStations = new();
+
+    private bool isDarkMode = false;
+    private string currentFilter = "All"; // All | AC | DC
+
+    private bool showNearbyPanel = false;
+    private bool isLocating = false;
+    private double? userLat;
+    private double? userLng;
+    private List<(MapStationDto Station, double DistanceKm)> nearbyStations = new();
+
+    private MapStationDto? selectedStation;
+    private DotNetObjectReference<Map>? dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            await LoadStations();
+
+            var (lat, lng) = GetInitialCenter();
+            await JsRuntime.InvokeVoidAsync("mapInterop.init", "station-map", lat, lng, 12);
+
+            await RenderMarkers();
+        }
+    }
+
+    private (double Lat, double Lng) GetInitialCenter()
+    {
+        var withCoords = allStations.Where(s => s.Latitude != 0 && s.Longitude != 0).ToList();
+        if (!withCoords.Any()) return (DefaultLat, DefaultLng);
+
+        return (withCoords.Average(s => s.Latitude), withCoords.Average(s => s.Longitude));
+    }
+
+    private async Task LoadStations()
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<StationsApiResult>("api/stations?pageNumber=1&pageSize=2000");
+            allStations = result?.Data ?? new();
+        }
+        catch
+        {
+            allStations = new();
+        }
+    }
+
+    private async Task RenderMarkers()
+    {
+        await JsRuntime.InvokeVoidAsync("mapInterop.clearMarkers");
+
+        visibleStations = allStations
+            .Where(s => s.Latitude != 0 && s.Longitude != 0 && MatchesFilter(s))
+            .ToList();
+
+        foreach (var s in visibleStations)
+        {
+            var statusColor = s.Status == "Active" ? "#2ecc71" : "#adb5bd";
+            await JsRuntime.InvokeVoidAsync(
+                "mapInterop.addStationMarker",
+                s.Id, s.Latitude, s.Longitude, s.Brand, s.StationName, statusColor, dotNetRef);
+        }
+
+        if (userLat != null && userLng != null)
+        {
+            ComputeNearby();
+        }
+    }
+
+    private bool MatchesFilter(MapStationDto s)
+    {
+        if (currentFilter == "All") return true;
+        return s.Sockets.Any(x => string.Equals(x.Type, currentFilter, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task CycleAcDcFilter()
+    {
+        currentFilter = currentFilter switch
+        {
+            "All" => "AC",
+            "AC" => "DC",
+            _ => "All"
+        };
+        await RenderMarkers();
+    }
+
+    private async Task ToggleDarkMode()
+    {
+        isDarkMode = await JsRuntime.InvokeAsync<bool>("mapInterop.toggleDarkMode");
+    }
+
+    private async Task LocateMe()
+    {
+        isLocating = true;
+        showNearbyPanel = true;
+        await JsRuntime.InvokeVoidAsync("mapInterop.locateUser", dotNetRef);
+    }
+
+    [JSInvokable]
+    public async Task OnLocationFound(double lat, double lng)
+    {
+        userLat = lat;
+        userLng = lng;
+        isLocating = false;
+        ComputeNearby();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnLocationError(string message)
+    {
+        isLocating = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnMarkerClicked(string stationId)
+    {
+        selectedStation = allStations.FirstOrDefault(s => s.Id == stationId);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ComputeNearby()
+    {
+        if (userLat == null || userLng == null) return;
+
+        nearbyStations = visibleStations
+            .Select(s => (Station: s, DistanceKm: GetDistanceKm(userLat.Value, userLng.Value, s.Latitude, s.Longitude)))
+            .OrderBy(x => x.DistanceKm)
+            .Take(8)
+            .ToList();
+    }
+
+    private async Task FlyToStation(MapStationDto station)
+    {
+        selectedStation = station;
+        await JsRuntime.InvokeVoidAsync("mapInterop.flyTo", station.Latitude, station.Longitude, 16);
+    }
+
+    private void ToggleNearbyPanel() => showNearbyPanel = !showNearbyPanel;
+
+    private string GetBrandColor(string? brand)
+    {
+        if (string.IsNullOrEmpty(brand)) return "#555555";
+        var hash = 0;
+        foreach (var c in brand) hash = c + ((hash << 5) - hash);
+        return Palette[Math.Abs(hash) % Palette.Length];
+    }
+
+    private string GetBrandInitials(string? brand)
+        => string.IsNullOrEmpty(brand) ? "??" : brand.Length >= 2 ? brand[..2].ToUpper() : brand.ToUpper();
+
+    private List<string> GetSocketTypes(MapStationDto s)
+        => s.Sockets.Select(x => x.Type).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct().ToList();
+
+    private static double GetDistanceKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371.0;
+        var dLat = ToRad(lat2 - lat1);
+        var dLon = ToRad(lon2 - lon1);
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRad(lat1)) * Math.Cos(ToRad(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return R * c;
+    }
+
+    private static double ToRad(double deg) => deg * Math.PI / 180;
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("mapInterop.destroy");
+        }
+        catch
+        {
+            // JS runtime may already be disconnected on navigation — safe to ignore.
+        }
+        dotNetRef?.Dispose();
+    }
+
+    // ===== Local models matching the API's JSON shape =====
+
+    private class StationsApiResult
+    {
+        public List<MapStationDto> Data { get; set; } = new();
+        public int TotalCount { get; set; }
+    }
+
+    private class MapStationDto
+    {
+        public string? Id { get; set; }
+        public string StationName { get; set; } = string.Empty;
+        public string Brand { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string District { get; set; } = string.Empty;
+        public string Status { get; set; } = "Active";
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double TotalPower { get; set; }
+        public List<MapSocketDto> Sockets { get; set; } = new();
+    }
+
+    private class MapSocketDto
+    {
+        public string Type { get; set; } = string.Empty;
+        public double Power { get; set; }
+    }
+}

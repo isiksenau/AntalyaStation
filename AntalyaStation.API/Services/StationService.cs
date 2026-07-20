@@ -38,9 +38,9 @@ namespace AntalyaStation.API.Services
                 DcSocketCount = allSockets.Count(sock =>
                     !string.IsNullOrEmpty(sock.Type) && sock.Type.ToUpper().Contains("DC")),
 
-                GreenChargingCount = stations.Count(s => s.IsGreenCharging),
+            /*    GreenChargingCount = stations.Count(s => s.IsGreenCharging),
                 SmartChargingCount = stations.Count(s => s.IsSmartCharging),
-
+*/
                 
                 
                 // Burada da anonim nesne değil, CompanyPowerDto listesi oluşturuyoruz

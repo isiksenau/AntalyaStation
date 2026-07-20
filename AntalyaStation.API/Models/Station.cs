@@ -23,9 +23,6 @@ namespace AntalyaStation.API.Models
 
         public int TotalSockets { get; set; }
 
-        public bool IsGreenCharging { get; set; }
-        public bool IsSmartCharging { get; set; }
-
         public List<Socket> Sockets { get; set; } = new();
         public DateTime AddedDate { get; set; } = DateTime.Now;
         public bool IsNew { get; set; } = true;
@@ -36,6 +33,11 @@ namespace AntalyaStation.API.Models
         // Append these two tracking fields to your existing Station class inside Station.cs
         public string? ImportBatchId { get; set; }
         public DateTime? FileUploadedDate { get; set; }
+        
+        // 🆕 Harita için konum bilgisi. Excel/manuel girişte doldurulmazsa 0 kalır
+                // ve bu istasyon haritada gösterilmez (Map.razor bu kontrolü yapıyor).
+                public double Latitude { get; set; }
+                public double Longitude { get; set; }
     }
 
     public class Socket

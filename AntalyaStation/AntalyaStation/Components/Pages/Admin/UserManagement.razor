@@ -1,5 +1,297 @@
-﻿@using Microsoft.AspNetCore.Authorization
-@page "/User-Management"
+﻿@page "/admin/user-management"
 @attribute [Authorize(Roles = "Admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Net.Http.Json
+@using AntalyaStation.API.DTOs
+@using Microsoft.AspNetCore.Authorization
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
 
-<h3></h3>
+<style>
+    .um-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 60%, #4a90e2 100%);
+        border-radius: 16px;
+        padding: 28px 32px;
+        color: #fff;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(30,60,114,0.25);
+    }
+    .um-header h3 { font-weight: 800; margin-bottom: 4px; }
+    .um-header p { opacity: 0.9; margin-bottom: 0; font-size: 14px; }
+
+    .um-card { border-radius: 14px; border: none; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .um-card thead th { background: #f8f9fb; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #6c757d; }
+
+    .role-pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .role-admin { background: #fde8e8; color: #c0392b; }
+    .role-user { background: #e6f0fd; color: #1a56b3; }
+
+    .form-label-sm { font-size: 12px; font-weight: 700; color: #495057; text-transform: uppercase; letter-spacing: 0.3px; }
+</style>
+
+<div class="container-fluid mt-3" style="font-size: 13px;">
+
+    <div class="um-header">
+        <h3><i class="bi bi-people-fill"></i> User Management</h3>
+        <p>Create, review, and manage user accounts across the platform.</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- ADD USER FORM -->
+        <div class="col-lg-4">
+            <div class="card um-card p-3">
+                <h6 class="fw-bold text-primary mb-3"><i class="bi bi-person-plus-fill me-1"></i> Add New User</h6>
+
+                <EditForm Model="_newUser" OnValidSubmit="CreateUser">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-2">
+                        <label class="form-label-sm d-block mb-1">Username</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="_newUser.Username" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label-sm d-block mb-1">Password</label>
+                        <InputText class="form-control form-control-sm" type="password" @bind-Value="_newUser.Password" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label-sm d-block mb-1">Full Name</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="_newUser.FullName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label-sm d-block mb-1">Email</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="_newUser.Email" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label-sm d-block mb-1">Role</label>
+                        <InputSelect class="form-select form-select-sm" @bind-Value="_newUser.Role">
+                            <option value="User">User</option>
+                            <option value="Admin">Admin</option>
+                        </InputSelect>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_formError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-2">@_formError</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_formSuccess))
+                    {
+                        <div class="alert alert-success py-2 small mb-2">@_formSuccess</div>
+                    }
+
+                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold py-2" disabled="@_isCreating">
+                        @if (_isCreating)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        <span>Create User</span>
+                    </button>
+                </EditForm>
+            </div>
+        </div>
+
+        <!-- USER LIST -->
+        <div class="col-lg-8">
+            <div class="card um-card">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold m-0 text-dark">Registered Users (@_users.Count)</h6>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="LoadUsers">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+
+                    @if (_isLoading)
+                    {
+                        <div class="text-center text-muted py-5">
+                            <div class="spinner-border text-primary spinner-border-sm mb-2"></div>
+                            <div>Loading users...</div>
+                        </div>
+                    }
+                    else if (!_users.Any())
+                    {
+                        <div class="text-center text-muted py-5">No users found.</div>
+                    }
+                    else
+                    {
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var u in _users)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@u.Username</td>
+                                    <td>@u.FullName</td>
+                                    <td class="text-muted">@u.Email</td>
+                                    <td>
+                                        <select class="form-select form-select-sm role-select"
+                                                value="@u.Role"
+                                                @onchange="(e) => ChangeRole(u, e.Value?.ToString())">
+                                            <option value="User">User</option>
+                                            <option value="Admin">Admin</option>
+                                        </select>
+                                    </td>
+                                    <td class="text-muted small">@u.CreatedDate.ToString("dd.MM.yyyy")</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteUser(u)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_listFeedback))
+                    {
+                        <div class="alert alert-info py-2 small mt-3 mb-0">@_listFeedback</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<UserListItemDto> _users = new();
+    private bool _isLoading = true;
+    private bool _isCreating = false;
+    private string _formError = "";
+    private string _formSuccess = "";
+    private string _listFeedback = "";
+
+    private CreateUserDto _newUser = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await EnforceAuthHeader();
+        await LoadUsers();
+    }
+
+    private async Task EnforceAuthHeader()
+    {
+        try
+        {
+            var token = await JsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+        }
+        catch
+        {
+            // Prerender or JS Interop error handling
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        _isLoading = true;
+        _listFeedback = "";
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<UserListItemDto>>("api/UserManagement");
+            if (result != null)
+            {
+                _users = result;
+            }
+        }
+        catch (Exception ex)
+        {
+            _listFeedback = "Error loading users: " + ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateUser()
+    {
+        _isCreating = true;
+        _formError = "";
+        _formSuccess = "";
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/UserManagement", _newUser);
+            if (response.IsSuccessStatusCode)
+            {
+                _formSuccess = "User created successfully.";
+                _newUser = new CreateUserDto();
+                await LoadUsers();
+            }
+            else
+            {
+                var err = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+                _formError = err != null && err.ContainsKey("message") ? err["message"] : "Failed to create user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private async Task ChangeRole(UserListItemDto user, string? newRole)
+    {
+        if (string.IsNullOrEmpty(newRole) || user.Role == newRole) return;
+
+        try
+        {
+            var updateDto = new UpdateUserRoleDto { Role = newRole };
+            var response = await Http.PutAsJsonAsync($"api/UserManagement/{user.Id}/role", updateDto);
+
+            if (response.IsSuccessStatusCode)
+            {
+                user.Role = newRole;
+                _listFeedback = $"Role for {user.Username} updated to {newRole}.";
+            }
+            else
+            {
+                _listFeedback = "Failed to update user role.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _listFeedback = "Error updating role: " + ex.Message;
+        }
+    }
+
+    private async Task DeleteUser(UserListItemDto user)
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete user '{user.Username}'?");
+        if (!confirmed) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/UserManagement/{user.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                _users.Remove(user);
+                _listFeedback = $"User '{user.Username}' deleted.";
+            }
+            else
+            {
+                _listFeedback = "Failed to delete user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _listFeedback = "Error deleting user: " + ex.Message;
+        }
+    }
+}

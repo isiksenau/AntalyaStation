@@ -1,243 +1,184 @@
 @page "/profile/my-info"
-@using System.Net.Http.Json
-@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Net.Http.Json
+@using AntalyaStation.API.DTOs
+@using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
 @inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthStateProvider
 
 <style>
-    .ps-header {
+    .mi-header {
         background: linear-gradient(135deg, #0d47a1 0%, #1976d2 60%, #00acc1 100%);
         border-radius: 16px;
         padding: 28px 32px;
         color: #fff;
-        margin-bottom: 24px;
-        box-shadow: 0 8px 24px rgba(13,71,161,0.2);
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-    .ps-header-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        background: rgba(255,255,255,0.15);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        flex-shrink: 0;
-    }
-    .ps-header h3 { font-weight: 800; margin-bottom: 2px; }
-    .ps-header p { opacity: 0.9; margin-bottom: 0; font-size: 14px; }
-
-    .ps-card {
-        background: #fff;
-        border-radius: 14px;
-        border: 1px solid #eef0f2;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.05);
-        padding: 28px;
-        max-width: 640px;
-    }
-    .ps-card-title {
-        font-weight: 700;
-        font-size: 16px;
-        color: #212529;
         margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        box-shadow: 0 8px 24px rgba(13,71,161,0.2);
     }
-    .ps-readonly-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 10px 0;
-        border-bottom: 1px solid #f1f3f5;
-        font-size: 14px;
-    }
-    .ps-readonly-row span:first-child { color: #6c757d; }
-    .ps-readonly-row span:last-child { font-weight: 600; color: #212529; }
+    .mi-header h3 { font-weight: 800; margin-bottom: 4px; }
+    .mi-header p { opacity: 0.9; margin-bottom: 0; font-size: 14px; }
 
-    .ps-alert {
-        margin-top: 16px;
-        border-radius: 10px;
-        padding: 12px 16px;
-        font-size: 13px;
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
+    .mi-card { border-radius: 14px; border: none; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .mi-card .form-label { font-size: 12px; font-weight: 700; color: #495057; text-transform: uppercase; letter-spacing: 0.3px; }
+
+    .mi-avatar {
+        width: 84px; height: 84px; border-radius: 50%;
+        background: linear-gradient(135deg, #1976d2, #00acc1);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2rem; font-weight: 800; color: #fff;
     }
-    .ps-alert-success { background: #e6f7ee; color: #16794e; border: 1px solid #b7ecd0; }
-    .ps-alert-error { background: #fdeaea; color: #c0392b; border: 1px solid #f3c1bc; }
 </style>
 
-<div class="container-fluid py-3">
+<div class="container-fluid mt-3" style="font-size: 13px; max-width: 700px;">
 
-    <div class="ps-header">
-        <div class="ps-header-icon"><i class="bi bi-person-circle"></i></div>
-        <div>
-            <h3>My Info</h3>
-            <p>View and update your basic profile details.</p>
-        </div>
+    <div class="mi-header">
+        <h3><i class="bi bi-person-badge-fill"></i> My Info</h3>
+        <p>View and update your personal account information.</p>
     </div>
 
-    @if (isLoading)
+    @if (_isLoading)
     {
-        <div class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Loading your profile...</div>
-    }
-    else if (profile == null)
-    {
-        <div class="ps-alert ps-alert-error"><i class="bi bi-exclamation-triangle-fill"></i> Could not load your profile. Please try again later.</div>
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+    </div>
     }
     else
     {
-        <div class="ps-card">
-            <div class="ps-card-title"><i class="bi bi-info-circle text-primary"></i> Account Details</div>
-
-            <div class="ps-readonly-row">
-                <span>Username</span>
-                <span>@profile.Username</span>
-            </div>
-            <div class="ps-readonly-row">
-                <span>Role</span>
-                <span>@profile.Role</span>
-            </div>
-            <div class="ps-readonly-row mb-3">
-                <span>Member since</span>
-                <span>@profile.CreatedDate.ToString("dd MMM yyyy")</span>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label small text-muted mb-1">Full Name</label>
-                <input class="form-control" @bind="editFullName" placeholder="Enter your full name" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label small text-muted mb-1">Email</label>
-                <input type="email" class="form-control" @bind="editEmail" placeholder="Enter your email address" />
-            </div>
-
-            <button class="btn btn-primary fw-semibold" @onclick="SaveProfile" disabled="@isSaving">
-                @if (isSaving)
-                {
-                    <span class="spinner-border spinner-border-sm me-2"></span>
-                    <span>Saving...</span>
-                }
-                else
-                {
-                    <span><i class="bi bi-check2 me-1"></i> Save Changes</span>
-                }
-            </button>
-
-            @if (!string.IsNullOrEmpty(feedback))
-            {
-                <div class="ps-alert @(isSuccess ? "ps-alert-success" : "ps-alert-error")">
-                    <i class="bi @(isSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill")"></i>
-                    <span>@feedback</span>
+    <div class="card mi-card">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="mi-avatar">@GetInitial()</div>
+                <div>
+                    <div class="fw-bold fs-5">@_profile?.FullName</div>
+                    <span class="badge bg-primary-subtle text-primary fw-semibold">@_profile?.Role</span>
                 </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_feedback))
+            {
+            <div class="alert @(_isError ? "alert-danger" : "alert-success") py-2 small mb-3">@_feedback</div>
             }
+
+            <EditForm Model="_form" OnValidSubmit="SaveProfile">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label d-block mb-1">Username</label>
+                        <InputText class="form-control" @bind-Value="_form.Username" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label d-block mb-1">Full Name</label>
+                        <InputText class="form-control" @bind-Value="_form.FullName" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label d-block mb-1">Email</label>
+                        <InputText class="form-control" @bind-Value="_form.Email" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label d-block mb-1">Phone Number</label>
+                        <InputText class="form-control" @bind-Value="_form.PhoneNumber" placeholder="+90 5xx xxx xx xx" />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="submit" class="btn btn-primary fw-semibold px-4" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Save Changes
+                    </button>
+                </div>
+            </EditForm>
         </div>
+    </div>
     }
 </div>
 
 @code {
-    private UserProfileDto? profile;
-    private bool isLoading = true;
-    private bool isSaving = false;
+private UserProfileDto? _profile;
+private UpdateProfileDto _form = new();
+private bool _isLoading = true;
+private bool _isSaving = false;
+private string _feedback = "";
+private bool _isError = false;
 
-    private string editFullName = "";
-    private string editEmail = "";
+protected override async Task OnInitializedAsync()
+{
+await LoadProfile();
+}
 
-    private string? feedback;
-    private bool isSuccess;
+private async Task LoadProfile()
+{
+_isLoading = true;
+try
+{
+_profile = await Http.GetFromJsonAsync<UserProfileDto>("api/auth/me");
+if (_profile != null)
+{
+_form = new UpdateProfileDto
+{
+Username = _profile.Username,
+FullName = _profile.FullName,
+Email = _profile.Email,
+PhoneNumber = _profile.PhoneNumber
+};
+}
+}
+catch (Exception ex)
+{
+_feedback = $"Failed to load profile: {ex.Message}";
+_isError = true;
+}
+_isLoading = false;
+}
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadProfile();
-    }
+private string GetInitial() =>
+string.IsNullOrWhiteSpace(_profile?.FullName) ? "?" : _profile.FullName.Trim()[0].ToString().ToUpper();
 
-    private async Task EnsureAuthHeader()
-    {
-        try
-        {
-            var token = await JsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
-            if (!string.IsNullOrEmpty(token))
-            {
-                Http.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            }
-        }
-        catch
-        {
-            // JS interop not ready yet (prerender) — request will simply go out without a token.
-        }
-    }
+private async Task SaveProfile()
+{
+_isSaving = true;
+_feedback = "";
+try
+{
+var response = await Http.PutAsJsonAsync("api/auth/profile", _form);
+if (response.IsSuccessStatusCode)
+{
+var result = await response.Content.ReadFromJsonAsync<UpdateResultDto>();
 
-    private async Task LoadProfile()
-    {
-        isLoading = true;
-        try
-        {
-            await EnsureAuthHeader();
-            profile = await Http.GetFromJsonAsync<UserProfileDto>("api/auth/me");
-            if (profile != null)
-            {
-                editFullName = profile.FullName;
-                editEmail = profile.Email;
-            }
-        }
-        catch
-        {
-            profile = null;
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
+// 🟢 Kullanıcı adı değiştiyse yeni token'ı kaydedip auth state'i yeniliyoruz
+if (result != null && !string.IsNullOrEmpty(result.Token))
+{
+await JsRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", result.Token);
+if (AuthStateProvider is AntalyaStation.Client.Handlers.CustomAuthStateProvider customProvider)
+{
+await customProvider.MarkUserAsAuthenticated(result.Token);
+}
+}
 
-    private async Task SaveProfile()
-    {
-        isSaving = true;
-        feedback = null;
-        try
-        {
-            await EnsureAuthHeader();
-            var response = await Http.PutAsJsonAsync("api/auth/profile", new
-            {
-                FullName = editFullName,
-                Email = editEmail
-            });
+_feedback = "Profile updated successfully.";
+_isError = false;
+await LoadProfile();
+}
+else
+{
+var rawError = await response.Content.ReadAsStringAsync();
+_feedback = $"Update failed: {rawError}";
+_isError = true;
+}
+}
+catch (Exception ex)
+{
+_feedback = $"Connection error: {ex.Message}";
+_isError = true;
+}
+_isSaving = false;
+}
 
-            if (response.IsSuccessStatusCode)
-            {
-                feedback = "Your profile was updated successfully.";
-                isSuccess = true;
-                await LoadProfile();
-            }
-            else
-            {
-                feedback = $"Update failed (HTTP {(int)response.StatusCode}).";
-                isSuccess = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            feedback = $"Something went wrong: {ex.Message}";
-            isSuccess = false;
-        }
-        finally
-        {
-            isSaving = false;
-        }
-    }
-
-    public class UserProfileDto
-    {
-        public string Username { get; set; } = string.Empty;
-        public string FullName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Role { get; set; } = string.Empty;
-        public DateTime CreatedDate { get; set; }
-    }
+public class UpdateResultDto
+{
+public string Message { get; set; } = string.Empty;
+public string? Token { get; set; }
+}
 }

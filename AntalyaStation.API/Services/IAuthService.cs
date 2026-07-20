@@ -11,4 +11,7 @@ public interface IAuthService
 
     (string Hash, string Salt) HashPassword(string password);
     bool VerifyPassword(string password, string hash, string salt);
+    
+    Task<(bool Success, string? Error, User? User)> CreateUserAsync(string username, string password, string fullName, string email, string role);
+
 }

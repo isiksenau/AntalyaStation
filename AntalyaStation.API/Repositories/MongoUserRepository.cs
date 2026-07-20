@@ -25,14 +25,16 @@ public class MongoUserRepository : IUserRepository
     public async Task AddAsync(User user)
         => await _users.InsertOneAsync(user);
 
-    public async Task<bool> UpdateProfileAsync(string id, string fullName, string email)
+    public async Task<bool> UpdateProfileAsync(string id, string username, string fullName, string email, string phoneNumber)
     {
         var update = Builders<User>.Update
+            .Set(u => u.Username, username)
             .Set(u => u.FullName, fullName)
-            .Set(u => u.Email, email);
+            .Set(u => u.Email, email)
+            .Set(u => u.PhoneNumber, phoneNumber);
 
         var result = await _users.UpdateOneAsync(u => u.Id == id, update);
-        return result.ModifiedCount > 0;
+        return result.ModifiedCount > 0 || result.MatchedCount > 0;
     }
 
     public async Task<bool> UpdatePasswordAsync(string id, string passwordHash, string passwordSalt)
@@ -44,5 +46,45 @@ public class MongoUserRepository : IUserRepository
 
         var result = await _users.UpdateOneAsync(u => u.Id == id, update);
         return result.ModifiedCount > 0;
+    }
+
+    public async Task<List<User>> GetAllAsync()
+        => await _users.Find(Builders<User>.Filter.Empty).SortBy(u => u.Username).ToListAsync();
+
+    public async Task<bool> UpdateRoleAsync(string id, string role)
+    {
+        var update = Builders<User>.Update.Set(u => u.Role, role);
+        var result = await _users.UpdateOneAsync(u => u.Id == id, update);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> DeleteAsync(string id)
+    {
+        var result = await _users.DeleteOneAsync(u => u.Id == id);
+        return result.DeletedCount > 0;
+    }
+
+    public async Task<bool> IsUsernameTakenAsync(string username, string? excludeUserId = null)
+    {
+        var filter = Builders<User>.Filter.Eq(u => u.Username, username);
+        if (!string.IsNullOrEmpty(excludeUserId))
+            filter &= Builders<User>.Filter.Ne(u => u.Id, excludeUserId);
+
+        var count = await _users.CountDocumentsAsync(filter);
+        return count > 0;
+    }
+    public async Task<bool> UpdatePermissionsAsync(string id, List<string> permissions)
+    {
+        var update = Builders<User>.Update.Set(u => u.Permissions, permissions);
+        var result = await _users.UpdateOneAsync(u => u.Id == id, update);
+        return result.ModifiedCount > 0;
+    }public async Task<long> CountAllAsync()
+    {
+        return await _users.CountDocumentsAsync(_ => true);
+    }
+
+    public async Task<long> CountByRoleAsync(string role)
+    {
+        return await _users.CountDocumentsAsync(u => u.Role == role);
     }
 }

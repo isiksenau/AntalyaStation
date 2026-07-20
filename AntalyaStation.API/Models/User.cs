@@ -13,12 +13,13 @@ public class User
     public string Username { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+    public string PhoneNumber { get; set; } = string.Empty;
     public string Role { get; set; } = "Admin";
 
-    // Passwords are never stored in plain text — only a salted hash.
     public string PasswordHash { get; set; } = string.Empty;
     public string PasswordSalt { get; set; } = string.Empty;
 
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? LastPasswordChangeDate { get; set; }
+    public List<string> Permissions { get; set; } = new();
 }

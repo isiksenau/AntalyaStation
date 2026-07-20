@@ -17,9 +17,8 @@ namespace AntalyaStation.API.DTOs
         public string City { get; set; } = "ANTALYA";
         public string District { get; set; } = string.Empty;
         public int TotalSockets { get; set; }
-
-        public bool IsGreenCharging { get; set; }
-        public bool IsSmartCharging { get; set; }
+        /*public bool IsGreenCharging { get; set; }
+        public bool IsSmartCharging { get; set; }*/
 
         public List<SocketDto> Sockets { get; set; } = new();
         public DateTime AddedDate { get; set; } = DateTime.Now;
@@ -34,6 +33,10 @@ namespace AntalyaStation.API.DTOs
             public int InsertedRows { get; set; }
             public int SkippedRows { get; set; }
         }
+        // 🆕 Harita için
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+ 
     }
 
     public class SocketDto

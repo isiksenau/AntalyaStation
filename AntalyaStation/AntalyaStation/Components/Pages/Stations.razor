@@ -261,7 +261,7 @@
                 <div class="col-md-3"><label class="form-label fw-semibold text-muted small">İl</label><input type="text" @bind="currentStation.City" class="form-control" required /></div>
                 <div class="col-md-3"><label class="form-label fw-semibold text-muted small">İlçe</label><input type="text" @bind="currentStation.District" class="form-control" required /></div>
                 <div class="col-md-12"><label class="form-label fw-semibold text-muted small">Adres</label><input type="text" @bind="currentStation.Address" class="form-control" /></div>
-
+            <!-- 
                 <div class="col-md-6 mt-4">
                     <div class="form-check form-switch">
                         <input type="checkbox" @bind="currentStation.IsGreenCharging" class="form-check-input" id="greenCheck" />
@@ -273,9 +273,9 @@
                         <input type="checkbox" @bind="currentStation.IsSmartCharging" class="form-check-input" id="smartCheck" />
                         <label class="form-check-label fw-bold" for="smartCheck">💡 Akıllı Şarj Uygulanıyor</label>
                     </div>
-                </div>
+                </div>-->
             </div>
-
+            
             <div class="mt-4 border p-3 rounded bg-light">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="m-0 text-secondary fw-bold">🔌 Soket Konfigürasyonu (@(currentStation.Sockets?.Count ?? 0) Adet)</h6>
@@ -430,8 +430,8 @@ Address = station.Address,
 City = station.City,
 District = station.District,
 TotalSockets = station.TotalSockets,
-IsGreenCharging = station.IsGreenCharging,
-IsSmartCharging = station.IsSmartCharging,
+/*IsGreenCharging = station.IsGreenCharging,
+IsSmartCharging = station.IsSmartCharging,*/
 Sockets = station.Sockets != null ? new List<SocketDto>(station.Sockets) : new List<SocketDto>()
 };
 await stationModal.ShowAsync();
