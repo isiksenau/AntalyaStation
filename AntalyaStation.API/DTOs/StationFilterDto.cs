@@ -16,5 +16,8 @@
         // null = Fark etmez, true = Evet, false = Hayır
         public bool? IsGreenCharging { get; set; }
         public bool? IsSmartCharging { get; set; }
+        public string? SortBy { get; set; }
+        public string? SortDirection { get; set; }
+        public bool IncludeInactive { get; set; }
     }
 }

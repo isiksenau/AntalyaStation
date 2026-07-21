@@ -29,6 +29,7 @@ namespace AntalyaStation.API.Models
         public double TotalPower { get; set; }
         public int SocketCount { get; set; }
         public string Status { get; set; } = "Active";
+        public DateTime? DeactivatedDate { get; set; }
         
         // Append these two tracking fields to your existing Station class inside Station.cs
         public string? ImportBatchId { get; set; }

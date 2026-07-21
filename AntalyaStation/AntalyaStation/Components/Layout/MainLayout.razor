@@ -1,4 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 
@@ -14,7 +15,7 @@
                     <div class="top-row px-4 d-flex justify-content-between align-items-center bg-light border-bottom">
                         <span class="text-secondary small">
                             <strong>Oturum:</strong> @context.User.Identity?.Name
-                            (<span class="text-primary fw-bold">@context.User.FindFirst("role")?.Value</span>)
+                            (<span class="text-primary fw-bold">@(context.User.FindFirst("role")?.Value ?? context.User.FindFirst(ClaimTypes.Role)?.Value)</span>)
                         </span>
                         <button @onclick="Logout" class="btn btn-sm btn-outline-danger py-1">
                             <i class="bi bi-box-arrow-left me-1"></i>Güvenli Çıkış

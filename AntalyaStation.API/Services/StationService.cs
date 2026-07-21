@@ -22,17 +22,17 @@ namespace AntalyaStation.API.Services
         // 🟢 Artık 'object' değil, doğrudan 'DashboardStatsDto' döndürüyoruz
         public async Task<DashboardStatsDto> GetDashboardStatsAsync()
         {
-            var stations = (await _repository.GetAllAsync()).ToList(); 
+            var stations = (await _repository.GetAllAsync()).Where(s => s.Status != "Inactive").ToList();
             var allSockets = stations.SelectMany(s => s.Sockets).ToList();
             var tr = new CultureInfo("tr-TR");
-            
+
             var stats = new DashboardStatsDto
             {
                 TotalActiveStations = stations.Count(s => s.Status == "Active"),
                 TotalPowerCapacity = stations.Sum(s => s.TotalPower),
                 TotalSocketCount = stations.Sum(s => s.SocketCount),
-                
-                
+
+
                 AcSocketCount = allSockets.Count(sock =>
                     string.IsNullOrEmpty(sock.Type) || !sock.Type.ToUpper().Contains("DC")),
                 DcSocketCount = allSockets.Count(sock =>
@@ -41,9 +41,19 @@ namespace AntalyaStation.API.Services
             /*    GreenChargingCount = stations.Count(s => s.IsGreenCharging),
                 SmartChargingCount = stations.Count(s => s.IsSmartCharging),
 */
-                
-                
+
+
                 // Burada da anonim nesne değil, CompanyPowerDto listesi oluşturuyoruz
+                SocketsByBrand = stations
+                    .GroupBy(s => string.IsNullOrWhiteSpace(s.Brand) ? "Bilinmiyor" : s.Brand)
+                    .Select(g => new BrandSocketDto
+                    {
+                        BrandName = g.Key,
+                        SocketCount = g.Sum(s => s.SocketCount)
+                    })
+                    .OrderByDescending(c => c.SocketCount)
+                    .ToList(),
+
                 PowerByCompany = stations
                     .GroupBy(s => s.Brand)
                     .Select(g => new CompanyPowerDto

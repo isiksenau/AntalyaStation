@@ -1,5 +1,5 @@
 ﻿@page "/admin/control-panel"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Net.Http.Json
 @using AntalyaStation.API.DTOs
