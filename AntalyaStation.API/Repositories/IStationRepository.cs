@@ -12,6 +12,7 @@ namespace AntalyaStation.API.Repositories
         Task AddAsync(Station station);
         Task<bool> UpdateAsync(string id, Station station);
         Task<bool> DeleteAsync(string id);
+        Task<bool> DeactivateAsync(string id);
         Task ClearAllStationsAsync();
 
         Task<List<string>> GetDistinctCitiesAsync();
@@ -20,7 +21,7 @@ namespace AntalyaStation.API.Repositories
         // 🟢 YENİ: Excel import / batch yönetimi için
         Task<HashSet<string>> GetExistingStationNumbersAsync();
         Task<Dictionary<string, int>> GetBatchCountsAsync();
-        Task<int> DeleteByDateAsync(DateTime date);
-        Task<int> DeleteByBatchIdAsync(string batchId);
+        Task<int> DeactivateByDateAsync(DateTime date);
+        Task<int> DeactivateByBatchIdAsync(string batchId);
     }
 }

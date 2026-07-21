@@ -90,7 +90,7 @@
             </div>
         </div>
 
-        <!-- ROW 2: SERVICE TYPE PIE & ADOPTION RADIAL GAUGE -->
+        <!-- ROW 2: SERVICE TYPE PIE & BRAND SOCKET DISTRIBUTION -->
         <div class="row g-4 mb-4">
             <div class="col-lg-5">
                 <div class="card shadow-sm border-0 p-4 bg-white h-100">
@@ -121,18 +121,35 @@
 
             <div class="col-lg-7">
                 <div class="card shadow-sm border-0 p-4 bg-white h-100">
-                    <h5 class="fw-bold mb-1 text-dark">🎯 Green &amp; Smart Charging Adoption</h5>
-                    <p class="text-muted small mb-3">Yeşil şarj ve akıllı şarj özelliğine sahip istasyon oranı.</p>
+                    @* Green & Smart Charging Adoption panel kaldırıldı. İstenirse geri alınabilmesi için yorumda tutuluyor:
+                       <h5>Green & Smart Charging Adoption</h5>
+                       <p>Yeşil şarj ve akıllı şarj özelliğine sahip istasyon oranı.</p> *@
+                    <h5 class="fw-bold mb-1 text-dark">🔌 Brand Socket Distribution</h5>
+                    <p class="text-muted small mb-3">Markalara göre toplam soket sayısı; ilk 12 marka gösterilir, kalanlar "Diğer" olarak gruplanır.</p>
 
-                    <div class="d-flex align-items-center justify-content-center" style="min-height: 300px;">
-                        <ApexChart TItem="GaugeMetric" Options="radialChartOptions" Height="300">
-                            <ApexPointSeries TItem="GaugeMetric"
-                                             Items="gaugeItems"
-                                             SeriesType="SeriesType.RadialBar"
-                                             XValue="@(e => e.Label)"
-                                             YValue="@(e => e.Value)" />
+                    @{
+                        var brandSockets = GetTopBrandSockets();
+                    }
+
+                    @if (brandSockets.Any())
+                    {
+                        <ApexChart TItem="BrandSocketDto" Options="brandSocketChartOptions" Height="@GetBrandChartHeight(brandSockets.Count)">
+                            <ApexPointSeries TItem="BrandSocketDto"
+                                             Items="brandSockets"
+                                             SeriesType="SeriesType.Bar"
+                                             Name="Socket Count"
+                                             XValue="@(e => e.BrandName)"
+                                             YValue="@(e => e.SocketCount)"
+                                             Color="#20c997" />
                         </ApexChart>
-                    </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-plug fs-3 text-secondary"></i>
+                            <div class="mt-2 small fw-semibold">No Brand Socket Data Found</div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -213,7 +230,7 @@
 
 @code {
     private DashboardStatsDto? stats;
-    private List<GaugeMetric> gaugeItems = new();
+    // Green/Smart metrikleri kaldırıldı; modelde eski veri uyumluluğu için alanlar kalabilir.
 
     private ApexChartOptions<SocketTypeMetric> donutChartOptions = new()
     {
@@ -240,11 +257,13 @@
         Legend = new Legend { Position = LegendPosition.Bottom }
     };
 
-    private ApexChartOptions<GaugeMetric> radialChartOptions = new()
+    private ApexChartOptions<BrandSocketDto> brandSocketChartOptions => brandChartOptionsToSockets;
+
+    private ApexChartOptions<BrandSocketDto> brandChartOptionsToSockets => new()
     {
         Chart = new Chart { Toolbar = new Toolbar { Show = false } },
-        Colors = new List<string> { "#28a745", "#17a2b8" },
-        Legend = new Legend { Show = true, Position = LegendPosition.Bottom }
+        PlotOptions = new PlotOptions { Bar = new PlotOptionsBar { Horizontal = true, BorderRadius = 4, BarHeight = "55%" } },
+        Xaxis = new XAxis { Labels = new XAxisLabels { Style = new AxisLabelStyle { FontSize = "11px" } } }
     };
 
     private ApexChartOptions<DistrictMetricDto> districtChartOptions = new()
@@ -267,21 +286,7 @@
         {
             stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
 
-            if (stats != null)
-            {
-                var greenPct = stats.TotalActiveStations > 0
-                    ? Math.Round((decimal)stats.GreenChargingCount / stats.TotalActiveStations * 100, 1)
-                    : 0;
-                var smartPct = stats.TotalActiveStations > 0
-                    ? Math.Round((decimal)stats.SmartChargingCount / stats.TotalActiveStations * 100, 1)
-                    : 0;
 
-                gaugeItems = new List<GaugeMetric>
-                {
-                    new() { Label = "Green Charging %", Value = greenPct },
-                    new() { Label = "Smart Charging %", Value = smartPct }
-                };
-            }
         }
         catch (Exception ex)
         {
@@ -312,9 +317,17 @@
         public int Count { get; set; }
     }
 
-    public class GaugeMetric
+    private List<BrandSocketDto> GetTopBrandSockets()
     {
-        public string Label { get; set; } = string.Empty;
-        public decimal  Value { get; set; }
+        if (stats?.SocketsByBrand == null || !stats.SocketsByBrand.Any())
+            return new();
+
+        var sorted = stats.SocketsByBrand.OrderByDescending(c => c.SocketCount).ToList();
+        if (sorted.Count <= 12) return sorted;
+
+        var top = sorted.Take(12).ToList();
+        var rest = sorted.Skip(12).Sum(c => c.SocketCount);
+        top.Add(new BrandSocketDto { BrandName = $"Diğer ({sorted.Count - 12} marka)", SocketCount = rest });
+        return top;
     }
 }

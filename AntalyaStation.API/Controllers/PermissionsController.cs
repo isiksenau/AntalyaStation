@@ -8,7 +8,7 @@ namespace AntalyaStation.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,SuperAdmin")]
 public class PermissionsController : ControllerBase
 {
     private readonly IUserRepository _userRepository;

@@ -1,5 +1,5 @@
 ﻿@page "/admin/user-management"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Net.Http.Json
 @using AntalyaStation.API.DTOs
@@ -24,6 +24,7 @@
 
     .role-pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
     .role-admin { background: #fde8e8; color: #c0392b; }
+    .role-superadmin { background: #f3e8ff; color: #6f42c1; }
     .role-user { background: #e6f0fd; color: #1a56b3; }
 
     .form-label-sm { font-size: 12px; font-weight: 700; color: #495057; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -66,6 +67,7 @@
                         <InputSelect class="form-select form-select-sm" @bind-Value="_newUser.Role">
                             <option value="User">User</option>
                             <option value="Admin">Admin</option>
+                            @* SuperAdmin tek ve sistem seviyesinde tutulur; yeni kullanıcı ekranından eklenmez. *@
                         </InputSelect>
                     </div>
 

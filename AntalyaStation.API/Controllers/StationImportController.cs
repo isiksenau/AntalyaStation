@@ -35,7 +35,7 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpGet("batches")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> GetActiveBatches()
         {
             var batches = await _excelImportService.GetActiveImportBatchesAsync();
@@ -43,25 +43,25 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpDelete("purge-by-date")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> PurgeByDate([FromQuery] string date)
         {
             if (!DateTime.TryParse(date, out DateTime parsedDate))
                 return BadRequest(new { Message = "Provided date string format could not be verified." });
 
-            var count = await _excelImportService.PurgeStationsByDateAsync(parsedDate);
-            return Ok(new { Message = $"Batch transaction complete. Purged {count} entries from matching date constraint." });
+            var count = await _excelImportService.DeactivateStationsByDateAsync(parsedDate);
+            return Ok(new { Message = $"Batch transaction complete. Deactivated {count} entries from matching date constraint." });
         }
 
         [HttpDelete("purge-by-batch/{batchId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> PurgeByBatch(string batchId)
         {
             if (string.IsNullOrEmpty(batchId))
                 return BadRequest(new { Message = "Target batch tracking identifier context cannot be null." });
 
-            var count = await _excelImportService.PurgeStationsByBatchIdAsync(batchId);
-            return Ok(new { Message = $"Batch group drop successful. Cleared {count} nodes matching Token Reference: {batchId}." });
+            var count = await _excelImportService.DeactivateStationsByBatchIdAsync(batchId);
+            return Ok(new { Message = $"Batch group drop successful. Deactivated {count} nodes matching Token Reference: {batchId}." });
         }
     }
 }

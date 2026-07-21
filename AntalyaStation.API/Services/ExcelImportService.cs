@@ -143,14 +143,17 @@ public class ExcelImportService : IExcelImportService
         return await _stationRepository.GetBatchCountsAsync();
     }
 
-    public async Task<int> PurgeStationsByDateAsync(DateTime date)
+    public async Task<int> DeactivateStationsByDateAsync(DateTime date)
     {
-        return await _stationRepository.DeleteByDateAsync(date);
+        return await _stationRepository.DeactivateByDateAsync(date);
     }
 
-    public async Task<int> PurgeStationsByBatchIdAsync(string batchId)
+    public async Task<int> DeactivateStationsByBatchIdAsync(string batchId)
     {
-        return await _stationRepository.DeleteByBatchIdAsync(batchId);
+        if (string.IsNullOrWhiteSpace(batchId))
+            return 0;
+
+        return await _stationRepository.DeactivateByBatchIdAsync(batchId.Trim());
     }
 
     private (string City, string District) ExtractCityAndDistrict(string? address)

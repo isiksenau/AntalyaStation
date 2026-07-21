@@ -33,7 +33,7 @@
         </div>
 
         <!-- 🗂️ Data Operations (Admin Only, Group) -->
-        <AuthorizeView Roles="Admin">
+        <AuthorizeView Roles="Admin,SuperAdmin">
             <Authorized>
                 <div class="nav-item px-3">
                     <div class="nav-link custom-dropdown-toggle" @onclick="ToggleDataOps" style="cursor: pointer;">
@@ -47,9 +47,8 @@
                             <NavLink class="nav-link submenu-link" href="admin/excel-upload">
                                 <span class="bi bi-file-earmark-arrow-up-fill-nav-menu" aria-hidden="true"></span> Excel Upload
                             </NavLink>
-                            <NavLink class="nav-link submenu-link" href="admin/add-data">
-                                <span class="bi bi-plus-circle-fill-nav-menu" aria-hidden="true"></span> Manual Data Entry
-                            </NavLink>
+                            @* Manual Data Entry sayfası istek üzerine arayüzden kaldırıldı.
+                               Route dosyası korunuyor; gerekirse tekrar menüye eklenebilir. *@
                         </div>
                     }
                 </div>
@@ -64,7 +63,7 @@
         </div>
 
         <!-- 👑 Admin Management (Admin Only, Group) -->
-        <AuthorizeView Roles="Admin">
+        <AuthorizeView Roles="Admin,SuperAdmin">
             <Authorized>
                 <div class="nav-item px-3">
                     <div class="nav-link custom-dropdown-toggle" @onclick="ToggleAdmin" style="cursor: pointer;">

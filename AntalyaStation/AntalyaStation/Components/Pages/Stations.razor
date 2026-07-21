@@ -106,16 +106,7 @@
                                         <option value="DC">DC</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4 d-flex align-items-center gap-3 mt-4">
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="greenCheckFilter" @bind="_isGreenChecked">
-                                        <label class="form-check-label text-muted small fw-semibold" for="greenCheckFilter">🌿 Yeşil Enerji</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="smartCheckFilter" @bind="_isSmartChecked">
-                                        <label class="form-check-label text-muted small fw-semibold" for="smartCheckFilter">💡 Akıllı Şarj</label>
-                                    </div>
-                                </div>
+                                @* Green/Smart filtreleri kaldırıldı. *@
                             </div>
                         </div>
                     </div>
@@ -261,7 +252,7 @@
                 <div class="col-md-3"><label class="form-label fw-semibold text-muted small">İl</label><input type="text" @bind="currentStation.City" class="form-control" required /></div>
                 <div class="col-md-3"><label class="form-label fw-semibold text-muted small">İlçe</label><input type="text" @bind="currentStation.District" class="form-control" required /></div>
                 <div class="col-md-12"><label class="form-label fw-semibold text-muted small">Adres</label><input type="text" @bind="currentStation.Address" class="form-control" /></div>
-            <!-- 
+            @*
                 <div class="col-md-6 mt-4">
                     <div class="form-check form-switch">
                         <input type="checkbox" @bind="currentStation.IsGreenCharging" class="form-check-input" id="greenCheck" />
@@ -273,9 +264,9 @@
                         <input type="checkbox" @bind="currentStation.IsSmartCharging" class="form-check-input" id="smartCheck" />
                         <label class="form-check-label fw-bold" for="smartCheck">💡 Akıllı Şarj Uygulanıyor</label>
                     </div>
-                </div>-->
+                </div>*@
             </div>
-            
+
             <div class="mt-4 border p-3 rounded bg-light">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="m-0 text-secondary fw-bold">🔌 Soket Konfigürasyonu (@(currentStation.Sockets?.Count ?? 0) Adet)</h6>
@@ -323,8 +314,6 @@ private int _pageSize = 10;
 private string modalTitle = "Yeni İstasyon Ekle";
 private string apiBaseUrl = "http://localhost:5079";
 
-private bool _isGreenChecked = false;
-private bool _isSmartChecked = false;
 
 private Dictionary<string, List<string>> _citiesAndDistricts = new()
 {
@@ -361,9 +350,6 @@ if (!_hasSearched) return new GridDataProviderResult<StationDto> { Data = new Li
 
 try
 {
-_filter.IsGreenCharging = _isGreenChecked ? true : null;
-_filter.IsSmartCharging = _isSmartChecked ? true : null;
-
 string cityParam = _filter.City == "Fark Etmez" ? "" : _filter.City;
 string districtParam = _filter.District == "Fark Etmez" ? "" : _filter.District;
 string serviceParam = _filter.ServiceType == "Fark Etmez" ? "" : _filter.ServiceType;
@@ -376,9 +362,7 @@ $"&district={Uri.EscapeDataString(districtParam)}" +
 $"&serviceType={Uri.EscapeDataString(serviceParam)}" +
 $"&brand={Uri.EscapeDataString(_filter.Brand ?? "")}" +
 $"&operatorNetwork={Uri.EscapeDataString(_filter.OperatorNetwork ?? "")}" +
-$"&stationType={Uri.EscapeDataString(typeParam)}" +
-$"&isGreenCharging={_filter.IsGreenCharging}" +
-$"&isSmartCharging={_filter.IsSmartCharging}";
+$"&stationType={Uri.EscapeDataString(typeParam)}";
 
 var response = await Http.GetFromJsonAsync<PagedResult<StationDto>>(url);
 if (response != null && response.Data != null)
@@ -473,8 +457,6 @@ if (response.IsSuccessStatusCode) await SorguyuCalistir();
 private async Task ClearFilters()
 {
 _filter = new StationLocalFilter();
-_isGreenChecked = false;
-_isSmartChecked = false;
 _hasSearched = false;
 if (grid != null) await grid.RefreshDataAsync();
 }
@@ -523,8 +505,7 @@ public string? OperatorNetwork { get; set; }
 public string? Brand { get; set; }
 public string ServiceType { get; set; } = "Fark Etmez";
 public string StationType { get; set; } = "Fark Etmez";
-public bool? IsGreenCharging { get; set; }
-public bool? IsSmartCharging { get; set; }
+/* Green/Smart filtre model alanları kaldırıldı. */
 }
 
 public class PagedResult<T>

@@ -87,7 +87,15 @@ namespace AntalyaStation.Client.Handlers
 
             if (keyValuePairs == null) return Array.Empty<Claim>();
 
-            return keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value?.ToString() ?? string.Empty));
+            var claims = keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value?.ToString() ?? string.Empty)).ToList();
+
+            var roleValue = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role || c.Type == "role")?.Value;
+            if (!string.IsNullOrWhiteSpace(roleValue) && claims.All(c => c.Type != "role"))
+                claims.Add(new Claim("role", roleValue));
+            if (!string.IsNullOrWhiteSpace(roleValue) && claims.All(c => c.Type != ClaimTypes.Role))
+                claims.Add(new Claim(ClaimTypes.Role, roleValue));
+
+            return claims;
         }
 
         private byte[] ParseBase64WithoutPadding(string base64)

@@ -8,7 +8,7 @@ namespace AntalyaStation.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,SuperAdmin")]
 public class UserManagementController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
@@ -48,6 +48,9 @@ public class UserManagementController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
+        if (!CanAssignRole(dto.Role))
+            return Forbid();
+
         var (success, error, user) = await _authService.CreateUserAsync(
             dto.Username, dto.Password, dto.FullName, dto.Email, dto.Role);
 
@@ -60,8 +63,8 @@ public class UserManagementController : ControllerBase
     [HttpPut("{id}/role")]
     public async Task<IActionResult> UpdateRole(string id, [FromBody] UpdateUserRoleDto dto)
     {
-        if (dto.Role != "Admin" && dto.Role != "User")
-            return BadRequest(new { Message = "Role must be either 'Admin' or 'User'." });
+        if (!CanAssignRole(dto.Role))
+            return Forbid();
 
         var updated = await _userRepository.UpdateRoleAsync(id, dto.Role);
         if (!updated) return NotFound(new { Message = "User not found." });
@@ -76,6 +79,13 @@ public class UserManagementController : ControllerBase
         if (!deleted) return NotFound(new { Message = "User not found." });
 
         return Ok(new { Message = "User deleted successfully." });
+    }
+
+    private bool CanAssignRole(string? role)
+    {
+        if (role == "User") return true;
+        if (role == "Admin") return User.IsInRole("SuperAdmin");
+        return false;
     }
 
     [HttpGet("system-stats")]

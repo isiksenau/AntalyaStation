@@ -37,7 +37,9 @@ namespace AntalyaStation.API.Repositories
         public async Task<(List<Station> Data, int TotalCount)> GetFilteredStationsAsync(StationFilterDto filter, int pageNumber, int pageSize)
         {
             var builder = Builders<Station>.Filter;
-            var filterDefinition = builder.Empty;
+            var filterDefinition = filter.IncludeInactive
+                ? builder.Empty
+                : builder.Ne(s => s.Status, "Inactive");
 
             if (!string.IsNullOrWhiteSpace(filter.SearchText))
             {
@@ -81,7 +83,9 @@ namespace AntalyaStation.API.Repositories
             }
 
             var totalCount = (int)await _stations.CountDocumentsAsync(filterDefinition);
+            var sort = BuildSortDefinition(filter);
             var data = await _stations.Find(filterDefinition)
+                .Sort(sort)
                 .Skip((pageNumber - 1) * pageSize)
                 .Limit(pageSize)
                 .ToListAsync();
@@ -112,6 +116,15 @@ namespace AntalyaStation.API.Repositories
         {
             var result = await _stations.DeleteOneAsync(s => s.Id == id);
             return result.DeletedCount > 0;
+        }
+
+        public async Task<bool> DeactivateAsync(string id)
+        {
+            var update = Builders<Station>.Update
+                .Set(s => s.Status, "Inactive")
+                .Set(s => s.DeactivatedDate, DateTime.Now);
+            var result = await _stations.UpdateOneAsync(s => s.Id == id && s.Status != "Inactive", update);
+            return result.ModifiedCount > 0;
         }
 
         public async Task ClearAllStationsAsync()
@@ -155,7 +168,7 @@ namespace AntalyaStation.API.Repositories
         public async Task<Dictionary<string, int>> GetBatchCountsAsync()
         {
             var pipeline = _stations.Aggregate()
-                .Match(s => s.ImportBatchId != null && s.ImportBatchId != "")
+                .Match(s => s.ImportBatchId != null && s.ImportBatchId != "" && s.Status != "Inactive")
                 .Group(s => s.ImportBatchId, g => new { BatchId = g.Key, Count = g.Count() });
 
             var results = await pipeline.ToListAsync();
@@ -165,23 +178,53 @@ namespace AntalyaStation.API.Repositories
         }
 
         // 🟢 YENİ: Belirli bir tarihe eklenen kayıtları siler (gün bazlı, saat dikkate alınmaz)
-        public async Task<int> DeleteByDateAsync(DateTime date)
+        public async Task<int> DeactivateByDateAsync(DateTime date)
         {
             var startOfDay = date.Date;
             var endOfDay = startOfDay.AddDays(1);
 
             var filter = Builders<Station>.Filter.Gte(s => s.AddedDate, startOfDay)
-                       & Builders<Station>.Filter.Lt(s => s.AddedDate, endOfDay);
+                       & Builders<Station>.Filter.Lt(s => s.AddedDate, endOfDay)
+                       & Builders<Station>.Filter.Ne(s => s.Status, "Inactive");
 
-            var result = await _stations.DeleteManyAsync(filter);
-            return (int)result.DeletedCount;
+            var update = Builders<Station>.Update
+                .Set(s => s.Status, "Inactive")
+                .Set(s => s.DeactivatedDate, DateTime.Now);
+
+            var result = await _stations.UpdateManyAsync(filter, update);
+            return (int)result.ModifiedCount;
         }
 
         // 🟢 YENİ: Belirli bir import batch'ine ait tüm kayıtları siler
-        public async Task<int> DeleteByBatchIdAsync(string batchId)
+        public async Task<int> DeactivateByBatchIdAsync(string batchId)
         {
-            var result = await _stations.DeleteManyAsync(s => s.ImportBatchId == batchId);
-            return (int)result.DeletedCount;
+            var filter = Builders<Station>.Filter.Eq(s => s.ImportBatchId, batchId)
+                       & Builders<Station>.Filter.Ne(s => s.Status, "Inactive");
+
+            var update = Builders<Station>.Update
+                .Set(s => s.Status, "Inactive")
+                .Set(s => s.DeactivatedDate, DateTime.Now);
+
+            var result = await _stations.UpdateManyAsync(filter, update);
+            return (int)result.ModifiedCount;
+        }
+
+        private static SortDefinition<Station> BuildSortDefinition(StationFilterDto filter)
+        {
+            var sortBy = (filter.SortBy ?? "stationName").Trim().ToLowerInvariant();
+            var descending = string.Equals(filter.SortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+            return sortBy switch
+            {
+                "stationnumber" => descending ? Builders<Station>.Sort.Descending(s => s.StationNumber) : Builders<Station>.Sort.Ascending(s => s.StationNumber),
+                "brand" => descending ? Builders<Station>.Sort.Descending(s => s.Brand) : Builders<Station>.Sort.Ascending(s => s.Brand),
+                "network" or "operatornetwork" => descending ? Builders<Station>.Sort.Descending(s => s.OperatorNetwork) : Builders<Station>.Sort.Ascending(s => s.OperatorNetwork),
+                "company" or "operatorstation" => descending ? Builders<Station>.Sort.Descending(s => s.OperatorStation) : Builders<Station>.Sort.Ascending(s => s.OperatorStation),
+                "power" or "kw" => descending ? Builders<Station>.Sort.Descending(s => s.TotalPower) : Builders<Station>.Sort.Ascending(s => s.TotalPower),
+                "deactivateddate" => descending ? Builders<Station>.Sort.Descending(s => s.DeactivatedDate) : Builders<Station>.Sort.Ascending(s => s.DeactivatedDate),
+                "addeddate" => descending ? Builders<Station>.Sort.Descending(s => s.AddedDate) : Builders<Station>.Sort.Ascending(s => s.AddedDate),
+                _ => descending ? Builders<Station>.Sort.Descending(s => s.StationName) : Builders<Station>.Sort.Ascending(s => s.StationName)
+            };
         }
     }
 }
