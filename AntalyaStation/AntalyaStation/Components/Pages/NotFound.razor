@@ -1,5 +1,17 @@
-﻿<h3>NotFound</h3>
+﻿@page "/not-found"
+
+<PageTitle>Sayfa Bulunamadı</PageTitle>
+
+<div class="container-fluid d-flex flex-column align-items-center justify-content-center" style="min-height: 70vh;">
+    <h1 class="display-1 fw-bold text-primary">404</h1>
+    <h3 class="text-muted mb-3">Aradığınız sayfa bulunamadı.</h3>
+    <a href="/" class="btn btn-primary">
+        <i class="bi bi-house-door-fill me-1"></i> Ana Sayfaya Dön
+    </a>
+</div>
 
 @code {
-    
+    // 🟢 Bu sayfa hem doğrudan "/not-found" adresine gidildiğinde
+    // hem de UseStatusCodePagesWithReExecute("/not-found") tarafından
+    // 404 durumunda otomatik olarak gösterilir.
 }

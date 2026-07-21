@@ -3,12 +3,15 @@
     public class DashboardStatsDto
     {
         public int TotalActiveStations { get; set; }
+        
+        public int TotalInactiveStations { get; set; }
         public double TotalPowerCapacity { get; set; }
         public int TotalSocketCount { get; set; }
         
         // Şirket bazlı güç dağılımı (Sadece özet isim ve değer)
         public List<CompanyPowerDto> PowerByCompany { get; set; } = new();
-        
+        public List<BrandSocketDto> SocketsByBrand { get; set; } = new();
+        public List<BrandSocketTypeDto> SocketTypesByBrand { get; set; } = new();
         // 💡 REQUIRED FOR ADVANCED CHARTS PANEL
         public int AcSocketCount { get; set; }
         public int DcSocketCount { get; set; }
@@ -24,7 +27,18 @@
     {
         public string CompanyName { get; set; } = string.Empty;
         public decimal TotalPower { get; set; } = 0M;
+    }public class BrandSocketDto
+    {
+        public string BrandName { get; set; } = string.Empty;
+        public int SocketCount { get; set; }
     }
+    public class BrandSocketTypeDto
+    {
+        public string BrandName { get; set; } = string.Empty;
+        public int AcSocketCount { get; set; }
+        public int DcSocketCount { get; set; }
+    }
+
     public class DistrictMetricDto
     {
         public string DistrictName { get; set; } = string.Empty;

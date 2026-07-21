@@ -65,6 +65,8 @@ public class UserListItemDto
 }public class SystemStatsDto
 {
     public int TotalStations { get; set; }
+    public int ActiveStations { get; set; }
+    public int InactiveStations { get; set; }
     public int TotalUsers { get; set; }
     public int AdminCount { get; set; }
     public int ActiveImportBatches { get; set; }

@@ -8,7 +8,7 @@ namespace AntalyaStation.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,SuperAdmin")]
 public class UserManagementController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
@@ -48,6 +48,11 @@ public class UserManagementController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
+        // 🟢 Rol atama yetkisi kontrolü — Admin sadece "User" oluşturabilir,
+        // "Admin" rolüyle kullanıcı oluşturmak sadece SuperAdmin'e açık.
+        if (!CanAssignRole(dto.Role))
+            return Forbid();
+
         var (success, error, user) = await _authService.CreateUserAsync(
             dto.Username, dto.Password, dto.FullName, dto.Email, dto.Role);
 
@@ -60,8 +65,8 @@ public class UserManagementController : ControllerBase
     [HttpPut("{id}/role")]
     public async Task<IActionResult> UpdateRole(string id, [FromBody] UpdateUserRoleDto dto)
     {
-        if (dto.Role != "Admin" && dto.Role != "User")
-            return BadRequest(new { Message = "Role must be either 'Admin' or 'User'." });
+        if (!CanAssignRole(dto.Role))
+            return Forbid();
 
         var updated = await _userRepository.UpdateRoleAsync(id, dto.Role);
         if (!updated) return NotFound(new { Message = "User not found." });
@@ -81,14 +86,16 @@ public class UserManagementController : ControllerBase
     [HttpGet("system-stats")]
     public async Task<IActionResult> GetSystemStats()
     {
-        var stations = (await _stationRepository.GetAllAsync()).Count();
+        var stations = (await _stationRepository.GetAllAsync()).ToList();
         var totalUsers = await _userRepository.CountAllAsync();
         var adminCount = await _userRepository.CountByRoleAsync("Admin");
         var batches = await _excelImportService.GetActiveImportBatchesAsync();
 
         var stats = new SystemStatsDto
         {
-            TotalStations = stations,
+            TotalStations = stations.Count,
+            ActiveStations = stations.Count(s => s.Status != "Inactive"),
+            InactiveStations = stations.Count(s => s.Status == "Inactive"),
             TotalUsers = (int)totalUsers,
             AdminCount = (int)adminCount,
             ActiveImportBatches = batches.Count,
@@ -97,5 +104,14 @@ public class UserManagementController : ControllerBase
         };
 
         return Ok(stats);
+    }
+
+    // 🟢 TEK BİR TANE — Admin sadece "User" rolü atayabilir,
+    // "Admin" rolü atamak sadece SuperAdmin yetkisiyle mümkün.
+    private bool CanAssignRole(string? role)
+    {
+        if (role == "User") return true;
+        if (role == "Admin") return User.IsInRole("SuperAdmin");
+        return false;
     }
 }

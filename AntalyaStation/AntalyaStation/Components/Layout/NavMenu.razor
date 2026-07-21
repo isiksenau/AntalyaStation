@@ -32,26 +32,13 @@
             </NavLink>
         </div>
 
-        <!-- 🗂️ Data Operations (Admin Only, Group) -->
-        <AuthorizeView Roles="Admin">
+        <!-- 🗂️ Data Import (Doğrudan Tek Tık Link) -->
+        <AuthorizeView Roles="Admin,SuperAdmin">
             <Authorized>
                 <div class="nav-item px-3">
-                    <div class="nav-link custom-dropdown-toggle" @onclick="ToggleDataOps" style="cursor: pointer;">
-                        <span class="bi bi-database-fill-gear-nav-menu" aria-hidden="true"></span> Data Operations
-                        <span class="ms-auto bi @(isDataOpsOpen ? "bi-chevron-up" : "bi-chevron-down")"></span>
-                    </div>
-
-                    @if (isDataOpsOpen)
-                    {
-                        <div class="submenu-container ps-4">
-                            <NavLink class="nav-link submenu-link" href="admin/excel-upload">
-                                <span class="bi bi-file-earmark-arrow-up-fill-nav-menu" aria-hidden="true"></span> Excel Upload
-                            </NavLink>
-                            <NavLink class="nav-link submenu-link" href="admin/add-data">
-                                <span class="bi bi-plus-circle-fill-nav-menu" aria-hidden="true"></span> Manual Data Entry
-                            </NavLink>
-                        </div>
-                    }
+                    <NavLink class="nav-link" href="admin/import-data">
+                        <span class="bi bi-database-fill-up-nav-menu" aria-hidden="true"></span> Data Import
+                    </NavLink>
                 </div>
             </Authorized>
         </AuthorizeView>
@@ -64,7 +51,7 @@
         </div>
 
         <!-- 👑 Admin Management (Admin Only, Group) -->
-        <AuthorizeView Roles="Admin">
+        <AuthorizeView Roles="Admin,SuperAdmin" Context="adminMenuContext">
             <Authorized>
                 <div class="nav-item px-3">
                     <div class="nav-link custom-dropdown-toggle" @onclick="ToggleAdmin" style="cursor: pointer;">
@@ -78,9 +65,15 @@
                             <NavLink class="nav-link submenu-link" href="admin/control-panel">
                                 <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> System Console
                             </NavLink>
-                            <NavLink class="nav-link submenu-link" href="admin/Permissions">
-                                <span class="bi bi-key-fill-nav-menu" aria-hidden="true"></span> Admin Permissions
-                            </NavLink>
+
+                            <AuthorizeView Roles="SuperAdmin" Context="superAdminContext">
+                                <Authorized>
+                                    <NavLink class="nav-link submenu-link" href="admin/Permissions">
+                                        <span class="bi bi-key-fill-nav-menu" aria-hidden="true"></span> Admin Permissions
+                                    </NavLink>
+                                </Authorized>
+                            </AuthorizeView>
+
                             <NavLink class="nav-link submenu-link" href="admin/user-management">
                                 <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> User Management
                             </NavLink>
@@ -114,11 +107,9 @@
 </div>
 
 @code {
-    private bool isDataOpsOpen = false;
     private bool isAdminOpen = false;
     private bool isSettingsOpen = false;
 
-    private void ToggleDataOps() => isDataOpsOpen = !isDataOpsOpen;
     private void ToggleAdmin() => isAdminOpen = !isAdminOpen;
     private void ToggleSettings() => isSettingsOpen = !isSettingsOpen;
 }

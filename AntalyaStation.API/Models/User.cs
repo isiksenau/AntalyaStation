@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿using Microsoft.AspNetCore.Authorization.Infrastructure;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace AntalyaStation.API.Models;
@@ -14,10 +15,14 @@ public class User
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
-    public string Role { get; set; } = "Admin";
+
 
     public string PasswordHash { get; set; } = string.Empty;
     public string PasswordSalt { get; set; } = string.Empty;
+
+
+    public String Role { get; set; } = "Admin";
+
 
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? LastPasswordChangeDate { get; set; }

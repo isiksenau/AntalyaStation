@@ -128,16 +128,28 @@
                                         <option value="DC">DC</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4 d-flex gap-3">
-                                    <div class="form-check m-0">
-                                        <input type="checkbox" class="form-check-input" id="greenCheckFilter" @bind="_isGreenChecked">
-                                        <label class="form-check-label text-muted fw-semibold" style="font-size: 12px;" for="greenCheckFilter">🌿 Green Energy</label>
-                                    </div>
-                                    <div class="form-check m-0">
-                                        <input type="checkbox" class="form-check-input" id="smartCheckFilter" @bind="_isSmartChecked">
-                                        <label class="form-check-label text-muted fw-semibold" style="font-size: 12px;" for="smartCheckFilter">💡 Smart Charging</label>
-                                    </div>
+                                @* Green Energy / Smart Charging filtreleri istek üzerine arayüzden kaldırıldı.
+                                   Geri gerekirse StationFilterDto içindeki eski alanlarla tekrar bağlanabilir. *@
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" @bind="_filter.SortBy">
+                                        <option value="stationName">Sort: Station A-Z</option>
+                                        <option value="brand">Sort: Brand A-Z</option>
+                                        <option value="network">Sort: Network A-Z</option>
+                                        <option value="company">Sort: Company A-Z</option>
+                                        <option value="power">Sort: kW Power</option>
+                                        <option value="deactivatedDate">Sort: Passive Date</option>
+                                    </select>
                                 </div>
+                                <div class="col-md-2">
+                                    <select class="form-select form-select-sm" @bind="_filter.SortDirection">
+                                        <option value="asc">Ascending</option>
+                                        <option value="desc">Descending</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 form-check m-0">
+                                    <input type="checkbox" class="form-check-input" id="inactiveFilter" checked="@_filter.IncludeInactive" @onchange="OnIncludeInactiveChanged">
+                                    <label class="form-check-label text-muted fw-semibold" style="font-size: 12px;" for="inactiveFilter">Show passive</label>
+                                    </div>
                             </div>
                         </div>
                     </div>
@@ -150,7 +162,17 @@
     <div class="card vd-table-card">
         <div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <h5 class="fw-bold m-0 text-dark">Station Records</h5>
+                <div>
+                    <h5 class="fw-bold m-0 text-dark">Station Records</h5>
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach (var sort in _quickSorts)
+                        {
+                            <button type="button" class="btn btn-sm @(IsSortActive(sort.Key) ? "btn-primary" : "btn-outline-primary") py-0" style="font-size: 11px;" @onclick="() => SortByColumn(sort.Key)">
+                                @sort.Label @GetSortIcon(sort.Key)
+                            </button>
+                        }
+                    </div>
+                </div>
                 <div class="d-flex gap-2 align-items-center">
                     <div class="d-flex align-items-center gap-1 bg-light p-1 rounded border" style="height: 33px;">
                         <label class="small text-muted fw-bold m-0 text-nowrap px-1" style="font-size: 11px;">Show:</label>
@@ -182,7 +204,22 @@
 
                     <GridColumn TItem="StationDto" HeaderText="Brand">@context.Brand</GridColumn>
                     <GridColumn TItem="StationDto" HeaderText="Network">@context.OperatorNetwork</GridColumn>
-
+                    <GridColumn TItem="StationDto" HeaderText="Added Date" PropertyName="AddedDate">@context.AddedDate.ToString("yyyy-MM-dd")</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="kW" PropertyName="TotalPower">@context.TotalPower</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Status">
+                        <span class="badge @(context.Status == "Inactive" ? "bg-secondary" : "bg-success")">@context.Status</span>
+                        @if (context.DeactivatedDate.HasValue)
+                        {
+                            <div class="text-muted" style="font-size: 11px;">@context.DeactivatedDate.Value.ToString("yyyy-MM-dd")</div>
+                        }
+                    </GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Status">
+                        <span class="badge @(context.Status == "Inactive" ? "bg-secondary" : "bg-success")">@context.Status</span>
+                        @if (context.DeactivatedDate.HasValue)
+                        {
+                            <div class="text-muted" style="font-size: 11px;">@context.DeactivatedDate.Value.ToString("yyyy-MM-dd")</div>
+                        }
+                    </GridColumn>
                     <GridColumn TItem="StationDto" HeaderText="Sockets">
                         <div class="d-flex align-items-center justify-content-center gap-1">
                             <span class="badge bg-primary px-2 py-1" style="font-size: 11px;">@context.SocketCount pcs</span>
@@ -271,13 +308,22 @@
     private string apiBaseUrl = "http://localhost:5079";
 
     private int _pageSize = 10;
-    private bool _isGreenChecked;
-    private bool _isSmartChecked;
     private List<StationDto> allCurrentData = new();
+    private readonly List<(string Key, string Label)> _quickSorts = new()
+    {
+        ("stationNumber", "Station No"),
+        ("stationName", "Station Name"),
+        ("brand", "Brand"),
+        ("network", "Network"),
+        ("power", "kW"),
+        ("socketCount", "Sockets"),
+        ("addedDate", "Added Date"),
+        ("deactivatedDate", "Passive Date")
+    };
 
     // 🟢 EKSİK OLAN VE GERİ EKLENEN ALAN
-    private StationFilterDto _filter = new() { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any" };
-
+    private StationFilterDto _filter = new() { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any", SortBy = "stationName", SortDirection = "asc" };
+    
     private Dictionary<string, List<string>> _citiesAndDistricts = new();
     private List<string> _allCities = new();
 
@@ -358,12 +404,35 @@
     {
         if (grid != null) await grid.RefreshDataAsync();
     }
+    private async Task OnIncludeInactiveChanged(ChangeEventArgs e)
+    {
+        _filter.IncludeInactive = e.Value is bool value && value;
+        await ExecuteQuery();
+    }
+
+    private async Task SortByColumn(string sortKey)
+    {
+        if (string.Equals(_filter.SortBy, sortKey, StringComparison.OrdinalIgnoreCase))
+            _filter.SortDirection = _filter.SortDirection == "asc" ? "desc" : "asc";
+        else
+        {
+            _filter.SortBy = sortKey;
+            _filter.SortDirection = "asc";
+        }
+
+        await ExecuteQuery();
+    }
+
+    private bool IsSortActive(string sortKey) => string.Equals(_filter.SortBy, sortKey, StringComparison.OrdinalIgnoreCase);
+
+    private string GetSortIcon(string sortKey) => IsSortActive(sortKey)
+        ? (_filter.SortDirection == "asc" ? "↑" : "↓")
+        : "↕";
 
     private async Task ClearFilters()
     {
-        _filter = new StationFilterDto { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any", SearchText = "" };
-        _isGreenChecked = false;
-        _isSmartChecked = false;
+        _filter = new StationFilterDto { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any", SearchText = "", SortBy = "stationName", SortDirection = "asc" };
+
         if (grid != null) await grid.RefreshDataAsync();
     }
 
@@ -382,8 +451,9 @@
                       $"&district={Uri.EscapeDataString(districtParam)}" +
                       $"&serviceType={Uri.EscapeDataString(serviceParam)}" +
                       $"&stationType={Uri.EscapeDataString(typeParam)}" +
-                      $"&isGreenCharging={(_isGreenChecked ? "true" : "")}" +
-                      $"&isSmartCharging={(_isSmartChecked ? "true" : "")}";
+                      $"&sortBy={Uri.EscapeDataString(_filter.SortBy ?? "stationName")}" +
+                      $"&sortDirection={Uri.EscapeDataString(_filter.SortDirection ?? "asc")}" +
+                      $"&includeInactive={_filter.IncludeInactive.ToString().ToLowerInvariant()}";
 
             var response = await Http.GetFromJsonAsync<PagedResult<StationDto>>(url);
             if (response != null)
@@ -407,8 +477,21 @@
 
     private async Task CloseSocketModal() => await socketDetailsModal.HideAsync();
 
-    private async Task ExportToExcel() { /* Excel download interop */ }
+    private async Task ExportToExcel()
+    {
+        if (!allCurrentData.Any()) return;
+        var rows = allCurrentData.Select(s => string.Join(",", new[]
+        {
+            EscapeCsv(s.StationNumber), EscapeCsv(s.StationName), EscapeCsv(s.Brand), EscapeCsv(s.OperatorNetwork),
+            EscapeCsv(s.OperatorStation), EscapeCsv(s.ServiceType), s.AddedDate.ToString("yyyy-MM-dd"), s.SocketCount.ToString(), s.TotalPower.ToString(),
+            EscapeCsv(s.Status), s.DeactivatedDate?.ToString("yyyy-MM-dd") ?? "", EscapeCsv(s.Address)
+        }));
+        var csv = "Station No,Station Name,Brand,Network,Company,Service Type,Added Date,Sockets,kW,Status,Passive Date,Address\n" + string.Join("\n", rows);
+        await JsRuntime.InvokeVoidAsync("eval", $"const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent({System.Text.Json.JsonSerializer.Serialize(csv)});a.download='stations.csv';a.click();");
+    }
 
+    private static string EscapeCsv(string? value) => $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
+    
     public class PagedResult<T>
     {
         public List<T> Data { get; set; } = new();

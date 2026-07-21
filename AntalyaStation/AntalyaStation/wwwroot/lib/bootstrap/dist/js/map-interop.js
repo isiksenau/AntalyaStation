@@ -29,7 +29,7 @@ window.mapInterop = {
         this.map = L.map(elementId, { zoomControl: false }).setView([centerLat, centerLng], zoom);
 
         this.tileLayer = L.tileLayer(
-            'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
             { attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20 }
         ).addTo(this.map);
 
@@ -44,8 +44,8 @@ window.mapInterop = {
         this.map.removeLayer(this.tileLayer);
         const url = this.isDark
             ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-
+            : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+        
         this.tileLayer = L.tileLayer(url, {
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             subdomains: 'abcd',

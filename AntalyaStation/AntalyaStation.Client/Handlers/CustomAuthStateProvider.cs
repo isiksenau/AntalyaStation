@@ -86,9 +86,15 @@ namespace AntalyaStation.Client.Handlers
             var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
 
             if (keyValuePairs == null) return Array.Empty<Claim>();
+            var claims = keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value?.ToString() ?? string.Empty)).ToList();
 
-            return keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value?.ToString() ?? string.Empty));
-        }
+            var roleValue = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role || c.Type == "role")?.Value;
+            if (!string.IsNullOrWhiteSpace(roleValue) && claims.All(c => c.Type != "role"))
+                claims.Add(new Claim("role", roleValue));
+            if (!string.IsNullOrWhiteSpace(roleValue) && claims.All(c => c.Type != ClaimTypes.Role))
+                claims.Add(new Claim(ClaimTypes.Role, roleValue));
+
+            return claims;        }
 
         private byte[] ParseBase64WithoutPadding(string base64)
         {

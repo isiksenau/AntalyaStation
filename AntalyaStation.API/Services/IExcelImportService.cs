@@ -7,7 +7,13 @@ namespace AntalyaStation.API.Services
     {
         Task<ImportSummaryDto> ImportStationsFromExcelAsync(IFormFile file);
         Task<Dictionary<string, int>> GetActiveImportBatchesAsync();
-        Task<int> PurgeStationsByDateAsync(DateTime targetDate);
-        Task<int> PurgeStationsByBatchIdAsync(string batchId);
+        Task<List<ImportBatchDto>> GetImportBatchesAsync();
+        Task<int> DeactivateStationsByDateAsync(DateTime targetDate);
+        Task<int> DeactivateStationsByBatchIdAsync(string batchId);
+        
+        
+        Task<bool> UpdateStationStatusAsync(string stationId, bool isActive);
+        Task<bool> UpdateBatchStatusAsync(string batchId, bool isActive);
+        
     }
 }

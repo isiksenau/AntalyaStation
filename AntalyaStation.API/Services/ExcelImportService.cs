@@ -85,7 +85,9 @@ public class ExcelImportService : IExcelImportService
                     OperatorNetwork = operatorNetwork ?? "Belirtilmemiş",
                     OperatorStation = operatorStation ?? "Belirtilmemiş",
                     Sockets = new List<Socket>(),
-                    ImportBatchId = batchId
+                    ImportBatchId = batchId,
+                    Status = "Active", // 🟢 Eklendi
+                    IsActive = true   // 🟢 Eklendi
                 };
 
                 if (!string.IsNullOrEmpty(socketNo))
@@ -119,67 +121,100 @@ public class ExcelImportService : IExcelImportService
             station.TotalPower = station.Sockets.Sum(s => s.Power);
         }
 
-        // 🟢 DEDUP: Veritabanında zaten var olan StationNumber'ları atla
-        var existingNumbers = await _stationRepository.GetExistingStationNumbersAsync();
-        var newStations = stationList.Where(s => !existingNumbers.Contains(s.StationNumber)).ToList();
-        var skippedCount = stationList.Count - newStations.Count;
+       // 🟢 KURUMSAL MANTIK: Mükerrer Kontrolü ve Pasif İstasyonu Aktife Çekme
+        var allExistingStations = await _stationRepository.GetAllStationsRawAsync(); // Veritabanındaki tüm İstasyonlar
+        
+        var insertedStations = new List<Station>();
+        int reactivatedCount = 0;
+        int skippedCount = 0;
 
-        if (newStations.Any())
+        foreach (var station in stationList)
         {
-            await _stationRepository.InsertManyAsync(newStations);
+            var existing = allExistingStations.FirstOrDefault(x => x.StationNumber == station.StationNumber);
+            if (existing != null)
+            {
+                if (!existing.IsActive)
+                {
+                    // Pasifteydi, tekrar yüklenince aktife çekiliyor
+                    await _stationRepository.UpdateStatusAsync(existing.Id, true);
+                    reactivatedCount++;
+                }
+                else
+                {
+                    // Zaten aktifti, atlanıyor
+                    skippedCount++;
+                }
+            }
+            else
+            {
+                // Hiç yoktu, yeni ekleniyor
+                insertedStations.Add(station);
+            }
+        }
+
+        if (insertedStations.Any())
+        {
+            await _stationRepository.InsertManyAsync(insertedStations);
         }
 
         return new ImportSummaryDto
         {
             TotalRows = stationList.Count,
-            InsertedRows = newStations.Count,
+            InsertedRows = insertedStations.Count,
+            ReactivatedRows = reactivatedCount,
             SkippedRows = skippedCount,
-            BatchId = batchId
+            BatchId = batchId,
+            ImportedStations = insertedStations.Select(s => new ImportedStationDto
+            {
+                Id = s.Id,
+                StationNumber = s.StationNumber,
+                StationName = s.StationName,
+                Brand = s.Brand,
+                AddedDate = s.AddedDate,
+                IsActive = s.IsActive
+            }).ToList()
         };
     }
 
-    public async Task<Dictionary<string, int>> GetActiveImportBatchesAsync()
+    public async Task<List<ImportBatchDto>> GetImportBatchesAsync()
     {
-        return await _stationRepository.GetBatchCountsAsync();
+        return await _stationRepository.GetImportBatchesAsync();
     }
 
-    public async Task<int> PurgeStationsByDateAsync(DateTime date)
+    public async Task<bool> UpdateStationStatusAsync(string stationId, bool isActive)
     {
-        return await _stationRepository.DeleteByDateAsync(date);
+        return await _stationRepository.UpdateStatusAsync(stationId, isActive);
     }
 
-    public async Task<int> PurgeStationsByBatchIdAsync(string batchId)
+    public async Task<bool> UpdateBatchStatusAsync(string batchId, bool isActive)
     {
-        return await _stationRepository.DeleteByBatchIdAsync(batchId);
+        return await _stationRepository.UpdateBatchStatusAsync(batchId, isActive);
     }
+
+    public async Task<Dictionary<string, int>> GetActiveImportBatchesAsync() => await _stationRepository.GetBatchCountsAsync();
+    public async Task<int> DeactivateStationsByDateAsync(DateTime date) => await _stationRepository.DeactivateByDateAsync(date);
+    public async Task<int> DeactivateStationsByBatchIdAsync(string batchId) => await _stationRepository.DeactivateByBatchIdAsync(batchId);
 
     private (string City, string District) ExtractCityAndDistrict(string? address)
     {
         string city = "Belirtilmemiş";
         string district = "Belirtilmemiş";
 
-        if (string.IsNullOrWhiteSpace(address))
-            return (city, district);
+        if (string.IsNullOrWhiteSpace(address)) return (city, district);
 
         if (address.Contains("/"))
         {
             var parts = address.Split('/');
             city = parts.Last().Trim();
-
             var beforeCity = string.Join("/", parts.Take(parts.Length - 1));
-            var matchedDistrict = KnownDistricts.FirstOrDefault(d =>
-                beforeCity.Contains(d, StringComparison.OrdinalIgnoreCase));
-
-            if (matchedDistrict != null)
-                district = matchedDistrict;
+            var matchedDistrict = KnownDistricts.FirstOrDefault(d => beforeCity.Contains(d, StringComparison.OrdinalIgnoreCase));
+            if (matchedDistrict != null) district = matchedDistrict;
         }
 
         if (district == "Belirtilmemiş")
         {
-            var matchedDistrict = KnownDistricts.FirstOrDefault(d =>
-                address.Contains(d, StringComparison.OrdinalIgnoreCase));
-            if (matchedDistrict != null)
-                district = matchedDistrict;
+            var matchedDistrict = KnownDistricts.FirstOrDefault(d => address.Contains(d, StringComparison.OrdinalIgnoreCase));
+            if (matchedDistrict != null) district = matchedDistrict;
         }
 
         return (city, district);

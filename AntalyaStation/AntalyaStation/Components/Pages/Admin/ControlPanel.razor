@@ -1,5 +1,5 @@
 ﻿@page "/admin/control-panel"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Net.Http.Json
 @using AntalyaStation.API.DTOs
@@ -55,10 +55,10 @@
             <div class="col-md-3">
                 <div class="card sc-card p-3">
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <i class="bi bi-plug text-success sc-stat-icon"></i>
+                        <i class="bi bi-archive text-secondary sc-stat-icon"></i>
                     </div>
-                    <div class="sc-stat-value">@_stats?.TotalSocketCount</div>
-                    <div class="sc-stat-label">Total Sockets</div>
+                    <div class="sc-stat-value">@_systemStats?.InactiveStations</div>
+                    <div class="sc-stat-label">Passive Stations</div>
                 </div>
             </div>
             <div class="col-md-3">
@@ -123,6 +123,7 @@
 @code {
     private DashboardStatsDto? _stats;
     private int _userCount = 0;
+    private SystemStatsDto? _systemStats;
     private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
@@ -130,6 +131,7 @@
         try
         {
             _stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
+            _systemStats = await Http.GetFromJsonAsync<SystemStatsDto>("api/UserManagement/system-stats");
             var users = await Http.GetFromJsonAsync<List<AdminUserListItemDto>>("api/users");
             _userCount = users?.Count ?? 0;
         }

@@ -26,13 +26,13 @@ namespace AntalyaStation.API.Controllers
             _stationService = stationService;
             _excelImportService = excelImportService;
         }
-
+    
         #region --- Standard Data Queries & Telemetry ---
 
         [HttpGet]
         public async Task<IActionResult> Get(
-            [FromQuery] StationFilterDto filter, 
-            [FromQuery] int pageNumber = 1, 
+            [FromQuery] StationFilterDto filter,
+            [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)
         {
             var (data, totalCount) = await _repository.GetFilteredStationsAsync(filter, pageNumber, pageSize);
@@ -65,7 +65,7 @@ namespace AntalyaStation.API.Controllers
         #region --- Individual CRUD Modifications ---
 
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Post([FromBody] Station station)
         {
             if (station == null) return BadRequest("Station data cannot be empty.");
@@ -84,11 +84,11 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")] 
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Put(string id, [FromBody] Station station)
         {
             if (station == null) return BadRequest("The target update payload is invalid.");
-            station.Id = id; 
+            station.Id = id;
             
             var isUpdated = await _repository.UpdateAsync(id, station);
             if (!isUpdated) return NotFound("The requested charging station could not be found.");
@@ -97,13 +97,29 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")] 
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Delete(string id)
         {
-            var isDeleted = await _repository.DeleteAsync(id);
+            var isDeleted = await _repository.DeactivateAsync(id);
             if (!isDeleted) return NotFound("The target charging station could not be found.");
             
-            return Ok(new { Message = "Station record deleted successfully." });
+            return Ok(new { Message = "Station record deactivated successfully." });
+        }
+
+        [HttpPut("{id}/status")]
+        public async Task<IActionResult> UpdateStationStatus(string id, [FromBody] StatusUpdateDto dto)
+        {
+            var result = await _excelImportService.UpdateStationStatusAsync(id, dto.IsActive);
+            if (!result) return NotFound();
+            return Ok(new { message = "Station status updated successfully." });
+        }
+
+        [HttpPut("batch/{batchId}/status")]
+        public async Task<IActionResult> UpdateBatchStatus(string batchId, [FromBody] StatusUpdateDto dto)
+        {
+            var result = await _excelImportService.UpdateBatchStatusAsync(batchId, dto.IsActive);
+            if (!result) return NotFound();
+            return Ok(new { message = "Batch status updated successfully." });
         }
 
         #endregion
@@ -111,7 +127,7 @@ namespace AntalyaStation.API.Controllers
         #region --- Enterprise Bulk Operations & Maintenance ---
 
         [HttpPost("import-excel")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> ImportExcel(IFormFile? file, [FromServices] IExcelImportService excelImportService)
         {
             if (file == null || file.Length == 0)
@@ -129,37 +145,38 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpGet("import-batches")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> GetImportBatches()
         {
-            var batches = await _excelImportService.GetActiveImportBatchesAsync();
+            // 🟢 DÜZELTME: GetActiveImportBatchesAsync yerine GetImportBatchesAsync çağrılıyor.
+            var batches = await _excelImportService.GetImportBatchesAsync();
             return Ok(batches);
         }
 
         [HttpDelete("purge-by-date")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> PurgeByDate([FromQuery] string date)
         {
             if (!DateTime.TryParse(date, out DateTime parsedDate))
                 return BadRequest(new { Message = "Provided date string format could not be verified." });
 
-            int count = await _excelImportService.PurgeStationsByDateAsync(parsedDate);
-            return Ok(new { Message = $"Batch transaction complete. Purged {count} entries from matching date constraint." });
+            int count = await _excelImportService.DeactivateStationsByDateAsync(parsedDate);
+            return Ok(new { Message = $"Batch transaction complete. Deactivated {count} entries from matching date constraint." });
         }
 
         [HttpDelete("purge-by-batch/{batchId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> PurgeByBatch(string batchId)
         {
             if (string.IsNullOrEmpty(batchId))
                 return BadRequest(new { Message = "Target batch tracking identifier context cannot be null." });
 
-            int count = await _excelImportService.PurgeStationsByBatchIdAsync(batchId);
-            return Ok(new { Message = $"Batch group drop successful. Cleared {count} nodes matching Token Reference: {batchId}." });
+            int count = await _excelImportService.DeactivateStationsByBatchIdAsync(batchId);
+            return Ok(new { Message = $"Batch group drop successful. Deactivated {count} nodes matching Token Reference: {batchId}." });
         }
 
         [HttpDelete("clear-all")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> ClearAll()
         {
             await _repository.ClearAllStationsAsync();
@@ -167,7 +184,7 @@ namespace AntalyaStation.API.Controllers
         }
 
         [HttpPost("cleanup-data")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> CleanupData()
         {
             var stations = (await _repository.GetAllAsync()).ToList();

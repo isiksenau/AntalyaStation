@@ -1,4 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 
@@ -9,18 +10,16 @@
                 <div class="sidebar">
                     <NavMenu />
                 </div>
-
                 <main>
-                    <div class="top-row px-4 d-flex justify-content-between align-items-center bg-light border-bottom">
+                    <div class="top-row px-4 d-flex justify-content-end align-items-center gap-3 bg-light border-bottom">
                         <span class="text-secondary small">
                             <strong>Oturum:</strong> @context.User.Identity?.Name
-                            (<span class="text-primary fw-bold">@context.User.FindFirst("role")?.Value</span>)
-                        </span>
+                            (<span class="text-primary fw-bold">@(context.User.FindFirst("role")?.Value ?? context.User.FindFirst(ClaimTypes.Role)?.Value)</span>)
+                            </span>
                         <button @onclick="Logout" class="btn btn-sm btn-outline-danger py-1">
                             <i class="bi bi-box-arrow-left me-1"></i>Güvenli Çıkış
                         </button>
                     </div>
-
                     <article class="content px-4 py-3">
                         @Body
                     </article>
@@ -28,18 +27,32 @@
             </div>
         </Authorized>
 
-        <!-- 🟢 DÜZELTME: Kullanıcı giriş yapmamışsa artık burada kart göstermek yerine
-             tek, gerçek login sayfası olan /login'e yönlendiriyoruz. -->
         <NotAuthorized>
-            @{
-                Navigation.NavigateTo("/login", forceLoad: false);
-            }
+            <!-- 🟢 Artık markup içinde değil, boş bir div döndürüyoruz. Yönlendirme aşağıdaki
+                 lifecycle metodunda, render tamamlandıktan SONRA tetikleniyor. -->
+            <div></div>
         </NotAuthorized>
     </AuthorizeView>
 </CascadingAuthenticationState>
 
 @code {
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+
+    private bool _hasRedirected = false;
+
+    // 🟢 Kimlik doğrulama durumunu render bittikten sonra kontrol edip
+    // gerekiyorsa burada yönlendiriyoruz — render sırasında değil.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_hasRedirected) return;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated != true)
+        {
+            _hasRedirected = true;
+            Navigation.NavigateTo("/login", forceLoad: false);
+        }
+    }
 
     private async Task Logout()
     {

@@ -26,6 +26,7 @@ namespace AntalyaStation.API.DTOs
         public double TotalPower { get; set; }
         public int SocketCount { get; set; }
         public string Status { get; set; } = "Active";
+        public DateTime? DeactivatedDate { get; set; }
         
         public class ImportSummaryDto
         {

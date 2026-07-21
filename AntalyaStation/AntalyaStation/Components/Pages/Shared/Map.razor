@@ -16,7 +16,7 @@
     .map-canvas {
         width: 100%;
         height: 100%;
-        background: #e5e3df;
+        background: #f1f5f9; filter: saturate(1.25) contrast(1.08);
     }
 
     /* ===== Circular overlay buttons ===== */
@@ -373,10 +373,45 @@
         {
             var result = await Http.GetFromJsonAsync<StationsApiResult>("api/stations?pageNumber=1&pageSize=2000");
             allStations = result?.Data ?? new();
+            ApplyFallbackCoordinates();
         }
         catch
         {
             allStations = new();
+        }
+    }
+    private void ApplyFallbackCoordinates()
+    {
+        for (var i = 0; i < allStations.Count; i++)
+        {
+            var station = allStations[i];
+            if (station.Latitude != 0 || station.Longitude != 0) continue;
+
+            var offset = (i % 25) * 0.003;
+            station.Latitude = station.District switch
+            {
+                "Kepez" => 36.918 + offset,
+                "Konyaaltı" => 36.870 + offset,
+                "Muratpaşa" => 36.884 + offset,
+                "Aksu" => 36.945 + offset,
+                "Döşemealtı" => 37.020 + offset,
+                "Serik" => 36.916 + offset,
+                "Manavgat" => 36.786 + offset,
+                "Alanya" => 36.545 + offset,
+                _ => DefaultLat + offset
+            };
+            station.Longitude = station.District switch
+            {
+                "Kepez" => 30.720 + offset,
+                "Konyaaltı" => 30.635 + offset,
+                "Muratpaşa" => 30.705 + offset,
+                "Aksu" => 30.845 + offset,
+                "Döşemealtı" => 30.602 + offset,
+                "Serik" => 31.098 + offset,
+                "Manavgat" => 31.443 + offset,
+                "Alanya" => 31.999 + offset,
+                _ => DefaultLng + offset
+            };
         }
     }
 
@@ -385,7 +420,7 @@
         await JsRuntime.InvokeVoidAsync("mapInterop.clearMarkers");
 
         visibleStations = allStations
-            .Where(s => s.Latitude != 0 && s.Longitude != 0 && MatchesFilter(s))
+            .Where(s => s.Latitude != 0 && s.Longitude != 0 && s.Status != "Inactive" && MatchesFilter(s))
             .ToList();
 
         foreach (var s in visibleStations)

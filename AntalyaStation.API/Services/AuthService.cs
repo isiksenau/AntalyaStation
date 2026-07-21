@@ -38,16 +38,16 @@ public class AuthService : IAuthService
 
     public async Task<User> EnsureDefaultAdminAsync()
     {
-        var existing = await _userRepository.GetByUsernameAsync("admin");
+        var existing = await _userRepository.GetByUsernameAsync("superadmin");
         if (existing != null) return existing;
 
         var (hash, salt) = HashPassword("Antalya123!");
         var admin = new User
         {
-            Username = "admin",
+            Username = "superadmin",
             FullName = "System Administrator",
-            Email = "admin@antalyastation.local",
-            Role = "Admin",
+            Email = "superadmin@antalyastation.local",
+            Role = "SuperAdmin",
             PasswordHash = hash,
             PasswordSalt = salt,
             CreatedDate = DateTime.UtcNow

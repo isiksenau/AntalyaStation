@@ -22,13 +22,15 @@ namespace AntalyaStation.API.Services
         // 🟢 Artık 'object' değil, doğrudan 'DashboardStatsDto' döndürüyoruz
         public async Task<DashboardStatsDto> GetDashboardStatsAsync()
         {
-            var stations = (await _repository.GetAllAsync()).ToList(); 
+            var allStations = (await _repository.GetAllAsync()).ToList();
+            var stations = allStations.Where(s => s.Status != "Inactive").ToList();
             var allSockets = stations.SelectMany(s => s.Sockets).ToList();
             var tr = new CultureInfo("tr-TR");
             
             var stats = new DashboardStatsDto
             {
                 TotalActiveStations = stations.Count(s => s.Status == "Active"),
+                TotalInactiveStations = allStations.Count(s => s.Status == "Inactive"),
                 TotalPowerCapacity = stations.Sum(s => s.TotalPower),
                 TotalSocketCount = stations.Sum(s => s.SocketCount),
                 
@@ -44,6 +46,27 @@ namespace AntalyaStation.API.Services
                 
                 
                 // Burada da anonim nesne değil, CompanyPowerDto listesi oluşturuyoruz
+                SocketsByBrand = stations
+                    .GroupBy(s => string.IsNullOrWhiteSpace(s.Brand) ? "Bilinmiyor" : s.Brand)
+                    .Select(g => new BrandSocketDto
+                    {
+                        BrandName = g.Key,
+                        SocketCount = g.Sum(s => s.SocketCount)
+                    })
+                    .OrderByDescending(c => c.SocketCount)
+                    .ToList(),
+
+                SocketTypesByBrand = stations
+                    .GroupBy(s => string.IsNullOrWhiteSpace(s.Brand) ? "Bilinmiyor" : s.Brand)
+                    .Select(g => new BrandSocketTypeDto
+                    {
+                        BrandName = g.Key,
+                        AcSocketCount = g.SelectMany(s => s.Sockets).Count(sock => string.IsNullOrEmpty(sock.Type) || !sock.Type.ToUpper().Contains("DC")),
+                        DcSocketCount = g.SelectMany(s => s.Sockets).Count(sock => !string.IsNullOrEmpty(sock.Type) && sock.Type.ToUpper().Contains("DC"))
+                    })
+                    .OrderByDescending(c => c.AcSocketCount + c.DcSocketCount)
+                    .Take(12)
+                    .ToList(),
                 PowerByCompany = stations
                     .GroupBy(s => s.Brand)
                     .Select(g => new CompanyPowerDto
