@@ -1,127 +1,118 @@
-﻿// wwwroot/js/map-interop.js
-// Blazor tarafından çağrılan Leaflet harita fonksiyonları.
-
-window.mapInterop = {
+﻿window.mapInterop = {
     map: null,
-    markers: [],
-    userMarker: null,
-    tileLayer: null,
-    isDark: false,
+    clusterGroup: null,
 
-    // Renk paleti — marka isminden tutarlı bir renk üretir (marka listesini hardcode etmeden)
-    _palette: ['#ff4d00', '#0057ff', '#00a651', '#7b2ff7', '#009688', '#e91e63', '#ff9800', '#3f51b5', '#795548', '#607d8b'],
-
-    brandColor: function (brand) {
-        if (!brand) return '#555555';
-        let hash = 0;
-        for (let i = 0; i < brand.length; i++) {
-            hash = brand.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const idx = Math.abs(hash) % this._palette.length;
-        return this._palette[idx];
-    },
-
-    init: function (elementId, centerLat, centerLng, zoom) {
+    init: function (elementId, lat, lng, zoom) {
         if (this.map) {
             this.map.remove();
+            this.map = null;
         }
 
-        this.map = L.map(elementId, { zoomControl: false }).setView([centerLat, centerLng], zoom);
+        this.map = L.map(elementId).setView([lat, lng], zoom);
 
-        this.tileLayer = L.tileLayer(
-            'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-            { attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20 }
-        ).addTo(this.map);
-
-        L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-        this.isDark = false;
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(this.map);
     },
 
-    toggleDarkMode: function () {
-        if (!this.map) return false;
-        this.isDark = !this.isDark;
+    renderMarkersBatch: function (stations, dotNetRef) {
+        if (!this.map) return;
 
-        this.map.removeLayer(this.tileLayer);
-        const url = this.isDark
-            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-        
-        this.tileLayer = L.tileLayer(url, {
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(this.map);
+        if (this.clusterGroup) {
+            this.map.removeLayer(this.clusterGroup);
+        }
 
-        return this.isDark;
+        if (typeof L.markerClusterGroup === 'function') {
+            this.clusterGroup = L.markerClusterGroup({
+                chunkedLoading: true,
+                maxClusterRadius: 44,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                // 🟢 Kurumsal, tek renk, temiz daire cluster ikonu
+                iconCreateFunction: function (cluster) {
+                    const count = cluster.getChildCount();
+                    const size = count < 10 ? 36 : count < 50 ? 44 : 52;
+                    return L.divIcon({
+                        html: `<div class="station-cluster"><span>${count}</span></div>`,
+                        className: '',
+                        iconSize: [size, size],
+                        iconAnchor: [size / 2, size / 2]
+                    });
+                }
+            });
+        } else {
+            this.clusterGroup = L.layerGroup();
+        }
+
+        let markersToAdd = [];
+
+        stations.forEach(s => {
+            let iconHtml = `<div class="station-pin" style="background-color: ${s.color};">
+                                ${s.initials}
+                            </div>`;
+
+            let customIcon = L.divIcon({
+                html: iconHtml,
+                className: '',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            let marker = L.marker([s.lat, s.lng], { icon: customIcon });
+
+            let popupContent = `
+                <div class="popup-content">
+                    <div class="popup-brand" style="color: ${s.color};">${s.brand}</div>
+                    <div class="popup-code">#${s.code}</div>
+                    <div class="popup-status">${s.status}</div>
+                    <div class="popup-district">${s.district}</div>
+                </div>
+            `;
+            marker.bindPopup(popupContent, { className: 'custom-popup' });
+
+            marker.on('click', function () {
+                if (dotNetRef) {
+                    dotNetRef.invokeMethodAsync('OnMarkerClicked', s.id);
+                }
+            });
+
+            markersToAdd.push(marker);
+        });
+
+        this.clusterGroup.addLayers(markersToAdd);
+        this.map.addLayer(this.clusterGroup);
     },
 
     clearMarkers: function () {
-        this.markers.forEach(m => this.map.removeLayer(m));
-        this.markers = [];
-    },
-
-    addStationMarker: function (id, lat, lng, brand, name, statusColor, dotNetRef) {
-        if (!this.map) return;
-
-        const initials = (brand || '??').substring(0, 2).toUpperCase();
-        const color = this.brandColor(brand);
-
-        const icon = L.divIcon({
-            className: 'station-marker-wrapper',
-            html: `
-                <div class="station-pin" style="background:${color}">
-                    <span>${initials}</span>
-                    <span class="status-dot" style="background:${statusColor}"></span>
-                </div>
-                <div class="station-pin-tail" style="border-top-color:${color}"></div>
-            `,
-            iconSize: [40, 50],
-            iconAnchor: [20, 48],
-            popupAnchor: [0, -46]
-        });
-
-        const marker = L.marker([lat, lng], { icon }).addTo(this.map);
-        marker.on('click', () => {
-            if (dotNetRef) dotNetRef.invokeMethodAsync('OnMarkerClicked', id);
-        });
-
-        this.markers.push(marker);
+        if (this.clusterGroup) {
+            this.clusterGroup.clearLayers();
+        }
     },
 
     flyTo: function (lat, lng, zoom) {
-        if (!this.map) return;
-        this.map.flyTo([lat, lng], zoom || 15, { duration: 1 });
+        if (this.map) {
+            this.map.flyTo([lat, lng], zoom);
+        }
+    },
+
+    toggleDarkMode: function () {
+        return false;
     },
 
     locateUser: function (dotNetRef) {
-        if (!navigator.geolocation) {
-            dotNetRef.invokeMethodAsync('OnLocationError', 'Geolocation is not supported by this browser.');
-            return;
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    let lat = position.coords.latitude;
+                    let lng = position.coords.longitude;
+                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnLocationFound', lat, lng);
+                },
+                error => {
+                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnLocationError', error.message);
+                }
+            );
         }
-
-        navigator.geolocation.getCurrentPosition(
-            pos => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-
-                if (this.userMarker) this.map.removeLayer(this.userMarker);
-
-                this.userMarker = L.circleMarker([lat, lng], {
-                    radius: 9,
-                    color: '#ffffff',
-                    weight: 3,
-                    fillColor: '#1976d2',
-                    fillOpacity: 1
-                }).addTo(this.map);
-
-                this.map.flyTo([lat, lng], 14, { duration: 1 });
-                dotNetRef.invokeMethodAsync('OnLocationFound', lat, lng);
-            },
-            err => {
-                dotNetRef.invokeMethodAsync('OnLocationError', err.message);
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
     },
 
     destroy: function () {
@@ -129,7 +120,5 @@ window.mapInterop = {
             this.map.remove();
             this.map = null;
         }
-        this.markers = [];
-        this.userMarker = null;
     }
 };

@@ -90,9 +90,8 @@ public class ExcelImportService : IExcelImportService
                     IsActive = true   // 🟢 Eklendi
                 };
 
-                if (!string.IsNullOrEmpty(socketNo))
+                if (!string.IsNullOrEmpty(socketNo) && double.TryParse(socketPower, out double powerVal) && powerVal > 0)
                 {
-                    double.TryParse(socketPower, out double powerVal);
                     currentStation.Sockets.Add(new Socket
                     {
                         SocketNumber = socketNo,
@@ -103,9 +102,9 @@ public class ExcelImportService : IExcelImportService
 
                 stationList.Add(currentStation);
             }
-            else if (currentStation != null && !string.IsNullOrEmpty(socketNo))
+            // YENİ:
+            else if (currentStation != null && !string.IsNullOrEmpty(socketNo) && double.TryParse(socketPower, out double powerVal) && powerVal > 0)
             {
-                double.TryParse(socketPower, out double powerVal);
                 currentStation.Sockets.Add(new Socket
                 {
                     SocketNumber = socketNo,

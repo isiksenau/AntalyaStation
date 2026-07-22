@@ -19,6 +19,7 @@
         public string Brand { get; set; } = string.Empty;
         public DateTime AddedDate { get; set; }
         public bool IsActive { get; set; } = true; // 🟢 Durum bilgisi
+        public DateTime? LastStatusChangeDate { get; set; }
     }
 
     public class ImportBatchDto

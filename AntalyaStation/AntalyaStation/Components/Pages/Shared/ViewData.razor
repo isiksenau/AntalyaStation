@@ -47,7 +47,7 @@
     <div class="card vd-filter-card mb-3">
         <div class="card-body p-3">
             <div class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label d-block mb-1">Search</label>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white py-0 px-2"><i class="bi bi-search text-primary" style="font-size: 12px;"></i></span>
@@ -56,39 +56,15 @@
                     </div>
                 </div>
 
-                <div class="col-md-2">
-                    <label class="form-label d-block mb-1">City</label>
-                    <select class="form-select form-select-sm" value="@_filter.City" @onchange="OnCityChanged">
-                        <option value="Any">Any</option>
-                        @foreach (var city in _citiesAndDistricts.Keys)
+                <div class="col-md-3">
+                    <label class="form-label d-block mb-1">District</label>
+                    <select class="form-select form-select-sm" @bind="_filter.District">
+                        <option value="Any">All Districts</option>
+                        @foreach (var district in _allDistricts)
                         {
-                            <option value="@city">@city</option>
+                            <option value="@district">@district</option>
                         }
                     </select>
-                </div>
-
-                <div class="col-md-2">
-                    @if (_filter.City != "Any")
-                    {
-                        <label class="form-label d-block mb-1">District</label>
-                        <select class="form-select form-select-sm" @bind="_filter.District">
-                            <option value="Any">All Districts</option>
-                            @if (_citiesAndDistricts.ContainsKey(_filter.City))
-                            {
-                                @foreach (var district in _citiesAndDistricts[_filter.City])
-                                {
-                                    <option value="@district">@district</option>
-                                }
-                            }
-                        </select>
-                    }
-                    else
-                    {
-                        <label class="form-label d-block mb-1 text-black-50">
-                            District <span style="font-size: 9px; opacity: 0.6;">(select city)</span>
-                        </label>
-                        <select class="form-select form-select-sm" disabled><option>Any</option></select>
-                    }
                 </div>
 
                 <div class="col-md-2">
@@ -128,28 +104,13 @@
                                         <option value="DC">DC</option>
                                     </select>
                                 </div>
-                                @* Green Energy / Smart Charging filtreleri istek üzerine arayüzden kaldırıldı.
-                                   Geri gerekirse StationFilterDto içindeki eski alanlarla tekrar bağlanabilir. *@
-                                <div class="col-md-3">
-                                    <select class="form-select form-select-sm" @bind="_filter.SortBy">
-                                        <option value="stationName">Sort: Station A-Z</option>
-                                        <option value="brand">Sort: Brand A-Z</option>
-                                        <option value="network">Sort: Network A-Z</option>
-                                        <option value="company">Sort: Company A-Z</option>
-                                        <option value="power">Sort: kW Power</option>
-                                        <option value="deactivatedDate">Sort: Passive Date</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <select class="form-select form-select-sm" @bind="_filter.SortDirection">
-                                        <option value="asc">Ascending</option>
-                                        <option value="desc">Descending</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2 form-check m-0">
-                                    <input type="checkbox" class="form-check-input" id="inactiveFilter" checked="@_filter.IncludeInactive" @onchange="OnIncludeInactiveChanged">
-                                    <label class="form-check-label text-muted fw-semibold" style="font-size: 12px;" for="inactiveFilter">Show passive</label>
+                                @if (_hasPassiveStations)
+                                {
+                                    <div class="col-md-3 form-check m-0">
+                                        <input type="checkbox" class="form-check-input" id="inactiveFilter" checked="@_filter.IncludeInactive" @onchange="OnIncludeInactiveChanged">
+                                        <label class="form-check-label text-muted fw-semibold" style="font-size: 12px;" for="inactiveFilter">Show passive</label>
                                     </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -164,14 +125,7 @@
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <div>
                     <h5 class="fw-bold m-0 text-dark">Station Records</h5>
-                    <div class="d-flex flex-wrap gap-1 mt-2">
-                        @foreach (var sort in _quickSorts)
-                        {
-                            <button type="button" class="btn btn-sm @(IsSortActive(sort.Key) ? "btn-primary" : "btn-outline-primary") py-0" style="font-size: 11px;" @onclick="() => SortByColumn(sort.Key)">
-                                @sort.Label @GetSortIcon(sort.Key)
-                            </button>
-                        }
-                    </div>
+                    <span class="text-muted small">Click a column header to sort.</span>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
                     <div class="d-flex align-items-center gap-1 bg-light p-1 rounded border" style="height: 33px;">
@@ -191,10 +145,10 @@
 
             <Grid @ref="grid" TItem="StationDto" DataProvider="StationsDataProvider" AllowPaging="true" PageSize="@_pageSize" Class="table table-hover table-bordered text-center align-middle mb-0" Responsive="true">
                 <GridColumns>
-                    <GridColumn TItem="StationDto" HeaderText="Station No" PropertyName="StationNumber">@context.StationNumber</GridColumn>
-                    <GridColumn TItem="StationDto" HeaderText="Station Name" PropertyName="StationName" Class="fw-semibold text-start">@context.StationName</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Station No" PropertyName="StationNumber" Sortable="true">@context.StationNumber</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Station Name" PropertyName="StationName" Sortable="true" Class="fw-semibold text-start">@context.StationName</GridColumn>
 
-                    <GridColumn TItem="StationDto" HeaderText="Service Type" PropertyName="ServiceType">
+                    <GridColumn TItem="StationDto" HeaderText="Service Type" Sortable="false">
                         @{
                             var badgeClass = GetServiceBadgeClass(context.ServiceType);
                             var badgeText = GetServiceBadgeText(context.ServiceType);
@@ -202,25 +156,20 @@
                         <span class="status-pill @badgeClass">@badgeText</span>
                     </GridColumn>
 
-                    <GridColumn TItem="StationDto" HeaderText="Brand">@context.Brand</GridColumn>
-                    <GridColumn TItem="StationDto" HeaderText="Network">@context.OperatorNetwork</GridColumn>
-                    <GridColumn TItem="StationDto" HeaderText="Added Date" PropertyName="AddedDate">@context.AddedDate.ToString("yyyy-MM-dd")</GridColumn>
-                    <GridColumn TItem="StationDto" HeaderText="kW" PropertyName="TotalPower">@context.TotalPower</GridColumn>
-                    <GridColumn TItem="StationDto" HeaderText="Status">
+                    <GridColumn TItem="StationDto" HeaderText="Brand" PropertyName="Brand" Sortable="true">@context.Brand</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Network" PropertyName="OperatorNetwork" Sortable="true">@context.OperatorNetwork</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="Added Date" PropertyName="AddedDate" Sortable="true">@context.AddedDate.ToString("yyyy-MM-dd")</GridColumn>
+                    <GridColumn TItem="StationDto" HeaderText="kW" PropertyName="Power" Sortable="true">@context.TotalPower</GridColumn>
+
+                    <GridColumn TItem="StationDto" HeaderText="Status" Sortable="false">
                         <span class="badge @(context.Status == "Inactive" ? "bg-secondary" : "bg-success")">@context.Status</span>
                         @if (context.DeactivatedDate.HasValue)
                         {
                             <div class="text-muted" style="font-size: 11px;">@context.DeactivatedDate.Value.ToString("yyyy-MM-dd")</div>
                         }
                     </GridColumn>
-                    <GridColumn TItem="StationDto" HeaderText="Status">
-                        <span class="badge @(context.Status == "Inactive" ? "bg-secondary" : "bg-success")">@context.Status</span>
-                        @if (context.DeactivatedDate.HasValue)
-                        {
-                            <div class="text-muted" style="font-size: 11px;">@context.DeactivatedDate.Value.ToString("yyyy-MM-dd")</div>
-                        }
-                    </GridColumn>
-                    <GridColumn TItem="StationDto" HeaderText="Sockets">
+
+                    <GridColumn TItem="StationDto" HeaderText="Sockets" PropertyName="SocketCount" Sortable="true">
                         <div class="d-flex align-items-center justify-content-center gap-1">
                             <span class="badge bg-primary px-2 py-1" style="font-size: 11px;">@context.SocketCount pcs</span>
                             <button type="button" class="btn btn-xs btn-info text-white px-1 py-0" style="font-size: 11px;" @onclick="() => OpenSocketDetails(context)">
@@ -229,7 +178,7 @@
                         </div>
                     </GridColumn>
 
-                    <GridColumn TItem="StationDto" HeaderText="Full Address" Class="text-start">
+                    <GridColumn TItem="StationDto" HeaderText="Full Address" Sortable="false" Class="text-start">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <div class="fw-semibold text-dark" style="font-size: 12px;">
                                 @context.City @(string.IsNullOrEmpty(context.District) ? "" : $"/ {context.District}")
@@ -309,47 +258,60 @@
 
     private int _pageSize = 10;
     private List<StationDto> allCurrentData = new();
-    private readonly List<(string Key, string Label)> _quickSorts = new()
-    {
-        ("stationNumber", "Station No"),
-        ("stationName", "Station Name"),
-        ("brand", "Brand"),
-        ("network", "Network"),
-        ("power", "kW"),
-        ("socketCount", "Sockets"),
-        ("addedDate", "Added Date"),
-        ("deactivatedDate", "Passive Date")
-    };
 
-    // 🟢 EKSİK OLAN VE GERİ EKLENEN ALAN
-    private StationFilterDto _filter = new() { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any", SortBy = "stationName", SortDirection = "asc" };
-    
-    private Dictionary<string, List<string>> _citiesAndDistricts = new();
-    private List<string> _allCities = new();
+    private StationFilterDto _filter = new() { District = "Any", ServiceType = "Any", StationType = "Any" };
+
+    // Flat, city-agnostic district list (no city filter — district only)
+    private List<string> _allDistricts = new();
+
+    // Only show the "Show passive" toggle when passive stations actually exist
+    private bool _hasPassiveStations = false;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadCities();
+        await LoadDistricts();
+        await CheckPassiveStationsExist();
     }
 
-    private async Task LoadCities()
+    private async Task LoadDistricts()
     {
         try
         {
             var cities = await Http.GetFromJsonAsync<List<string>>($"{apiBaseUrl}/api/stations/cities");
-            _allCities = cities ?? new List<string>();
+            var districtSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var city in _allCities)
+            foreach (var city in cities ?? new List<string>())
             {
                 var districts = await Http.GetFromJsonAsync<List<string>>(
                     $"{apiBaseUrl}/api/stations/cities/{Uri.EscapeDataString(city)}/districts");
-                _citiesAndDistricts[city] = districts ?? new List<string>();
+
+                foreach (var d in districts ?? new List<string>())
+                    districtSet.Add(d);
             }
+
+            _allDistricts = districtSet.OrderBy(d => d).ToList();
         }
         catch
         {
-            _allCities = new List<string>();
-            _citiesAndDistricts = new();
+            _allDistricts = new List<string>();
+        }
+    }
+
+    private async Task CheckPassiveStationsExist()
+    {
+        try
+        {
+            var stats = await Http.GetFromJsonAsync<DashboardStatsDto>($"{apiBaseUrl}/api/stations/dashboard-stats");
+            _hasPassiveStations = (stats?.TotalInactiveStations ?? 0) > 0;
+        }
+        catch
+        {
+            _hasPassiveStations = false;
+        }
+
+        if (!_hasPassiveStations)
+        {
+            _filter.IncludeInactive = false;
         }
     }
 
@@ -379,12 +341,6 @@
         }
     }
 
-    private void OnCityChanged(ChangeEventArgs e)
-    {
-        _filter.City = e.Value?.ToString() ?? "Any";
-        _filter.District = "Any";
-    }
-
     private async Task OnPageSizeChanged(ChangeEventArgs e)
     {
         if (int.TryParse(e.Value?.ToString(), out int size))
@@ -404,55 +360,39 @@
     {
         if (grid != null) await grid.RefreshDataAsync();
     }
+
     private async Task OnIncludeInactiveChanged(ChangeEventArgs e)
     {
         _filter.IncludeInactive = e.Value is bool value && value;
         await ExecuteQuery();
     }
 
-    private async Task SortByColumn(string sortKey)
-    {
-        if (string.Equals(_filter.SortBy, sortKey, StringComparison.OrdinalIgnoreCase))
-            _filter.SortDirection = _filter.SortDirection == "asc" ? "desc" : "asc";
-        else
-        {
-            _filter.SortBy = sortKey;
-            _filter.SortDirection = "asc";
-        }
-
-        await ExecuteQuery();
-    }
-
-    private bool IsSortActive(string sortKey) => string.Equals(_filter.SortBy, sortKey, StringComparison.OrdinalIgnoreCase);
-
-    private string GetSortIcon(string sortKey) => IsSortActive(sortKey)
-        ? (_filter.SortDirection == "asc" ? "↑" : "↓")
-        : "↕";
-
     private async Task ClearFilters()
     {
-        _filter = new StationFilterDto { City = "Any", District = "Any", ServiceType = "Any", StationType = "Any", SearchText = "", SortBy = "stationName", SortDirection = "asc" };
+        _filter = new StationFilterDto { District = "Any", ServiceType = "Any", StationType = "Any", SearchText = "", IncludeInactive = false };
 
         if (grid != null) await grid.RefreshDataAsync();
     }
 
+    // 🟢 Sorting artık ayrı butonlarla değil, kolon başlığına tıklayınca Grid'in kendi
+    // sıralama mekanizmasından (request.Sorting) okunuyor.
     private async Task<GridDataProviderResult<StationDto>> StationsDataProvider(GridDataProviderRequest<StationDto> request)
     {
         try
         {
-            string cityParam = _filter.City == "Any" ? "" : _filter.City;
             string districtParam = _filter.District == "Any" ? "" : _filter.District;
             string serviceParam = _filter.ServiceType == "Any" ? "" : _filter.ServiceType;
             string typeParam = _filter.StationType == "Any" ? "" : _filter.StationType;
 
+            var (sortBy, sortDirection) = ResolveSort(request);
+
             var url = $"{apiBaseUrl}/api/stations?pageNumber={request.PageNumber}&pageSize={request.PageSize}" +
                       $"&searchText={Uri.EscapeDataString(_filter.SearchText ?? "")}" +
-                      $"&city={Uri.EscapeDataString(cityParam)}" +
                       $"&district={Uri.EscapeDataString(districtParam)}" +
                       $"&serviceType={Uri.EscapeDataString(serviceParam)}" +
                       $"&stationType={Uri.EscapeDataString(typeParam)}" +
-                      $"&sortBy={Uri.EscapeDataString(_filter.SortBy ?? "stationName")}" +
-                      $"&sortDirection={Uri.EscapeDataString(_filter.SortDirection ?? "asc")}" +
+                      $"&sortBy={Uri.EscapeDataString(sortBy)}" +
+                      $"&sortDirection={Uri.EscapeDataString(sortDirection)}" +
                       $"&includeInactive={_filter.IncludeInactive.ToString().ToLowerInvariant()}";
 
             var response = await Http.GetFromJsonAsync<PagedResult<StationDto>>(url);
@@ -467,6 +407,28 @@
             Console.WriteLine($"Grid data link error: {ex.Message}");
         }
         return new GridDataProviderResult<StationDto> { Data = new List<StationDto>(), TotalCount = 0 };
+    }
+
+    // 🟢 Grid kütüphanesinin sürüm farklarına dayanıklı olmak için Sorting öğesindeki
+    // alan adını reflection ile arıyoruz (PropertyName / SortString / SortLabel).
+    private (string SortBy, string SortDirection) ResolveSort(GridDataProviderRequest<StationDto> request)
+    {
+        string sortBy = "stationName";
+        string sortDirection = "asc";
+
+        var activeSort = request.Sorting?.FirstOrDefault(s => s.SortDirection != SortDirection.None);
+        if (activeSort != null)
+        {
+            var type = activeSort.GetType();
+            var prop = type.GetProperty("PropertyName") ?? type.GetProperty("SortString") ?? type.GetProperty("SortLabel");
+            if (prop != null)
+            {
+                sortBy = prop.GetValue(activeSort)?.ToString() ?? sortBy;
+            }
+            sortDirection = activeSort.SortDirection == SortDirection.Descending ? "desc" : "asc";
+        }
+
+        return (sortBy, sortDirection);
     }
 
     private async Task OpenSocketDetails(StationDto station)
@@ -491,7 +453,7 @@
     }
 
     private static string EscapeCsv(string? value) => $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
-    
+
     public class PagedResult<T>
     {
         public List<T> Data { get; set; } = new();

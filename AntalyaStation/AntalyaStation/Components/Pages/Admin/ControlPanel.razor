@@ -36,106 +36,170 @@
 
     @if (_isLoading)
     {
-        <div class="text-center py-5">
-            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-        </div>
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+    </div>
     }
     else
     {
-        <div class="row g-3 mb-3">
-            <div class="col-md-3">
-                <div class="card sc-card p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <i class="bi bi-ev-station text-primary sc-stat-icon"></i>
-                    </div>
-                    <div class="sc-stat-value">@_stats?.TotalActiveStations</div>
-                    <div class="sc-stat-label">Active Stations</div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card sc-card p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-ev-station text-primary sc-stat-icon"></i>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card sc-card p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <i class="bi bi-archive text-secondary sc-stat-icon"></i>
-                    </div>
-                    <div class="sc-stat-value">@_systemStats?.InactiveStations</div>
-                    <div class="sc-stat-label">Passive Stations</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card sc-card p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <i class="bi bi-lightning-charge text-warning sc-stat-icon"></i>
-                    </div>
-                    <div class="sc-stat-value">@_stats?.TotalPowerCapacity.ToString("N0")</div>
-                    <div class="sc-stat-label">Total Power (kW)</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card sc-card p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <i class="bi bi-people-fill text-info sc-stat-icon"></i>
-                    </div>
-                    <div class="sc-stat-value">@_userCount</div>
-                    <div class="sc-stat-label">Registered Users</div>
-                </div>
+                <div class="sc-stat-value">@_stats?.TotalActiveStations</div>
+                <div class="sc-stat-label">Active Stations</div>
             </div>
         </div>
+        <div class="col-md-3">
+            <div class="card sc-card p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-archive text-secondary sc-stat-icon"></i>
+                </div>
+                <div class="sc-stat-value">@_systemStats?.InactiveStations</div>
+                <div class="sc-stat-label">Passive Stations</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card sc-card p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-lightning-charge text-warning sc-stat-icon"></i>
+                </div>
+                <div class="sc-stat-value">@_stats?.TotalPowerCapacity.ToString("N0")</div>
+                <div class="sc-stat-label">Total Power (kW)</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card sc-card p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-people-fill text-info sc-stat-icon"></i>
+                </div>
+                <div class="sc-stat-value">@_userCount</div>
+                <div class="sc-stat-label">Registered Users</div>
+            </div>
+        </div>
+    </div>
 
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="card sc-card p-3">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-server me-1"></i> Service Status</h6>
-                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                        <span class="text-muted">API Layer</span>
-                        <span><span class="sc-status-dot sc-status-ok"></span>Online</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                        <span class="text-muted">Database Connection</span>
-                        <span><span class="sc-status-dot sc-status-ok"></span>Connected</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted">Authentication Service</span>
-                        <span><span class="sc-status-dot sc-status-ok"></span>Operational</span>
-                    </div>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card sc-card p-3">
+                <h6 class="fw-bold mb-3"><i class="bi bi-server me-1"></i> Service Status</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                    <span class="text-muted">API Layer</span>
+                    <span><span class="sc-status-dot sc-status-ok"></span>Online</span>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card sc-card p-3">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-1"></i> Environment</h6>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <span class="text-muted">Application</span>
-                        <span class="fw-semibold">AntalyaStation Platform</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <span class="text-muted">Environment</span>
-                        <span class="fw-semibold">Development</span>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Report Generated</span>
-                        <span class="fw-semibold">@DateTime.Now.ToString("dd.MM.yyyy HH:mm")</span>
-                    </div>
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                    <span class="text-muted">Database Connection</span>
+                    <span><span class="sc-status-dot sc-status-ok"></span>Connected</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Authentication Service</span>
+                    <span><span class="sc-status-dot sc-status-ok"></span>Operational</span>
                 </div>
             </div>
         </div>
+        <div class="col-md-6">
+            <div class="card sc-card p-3">
+                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-1"></i> Environment</h6>
+                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                    <span class="text-muted">Application</span>
+                    <span class="fw-semibold">AntalyaStation Platform</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                    <span class="text-muted">Environment</span>
+                    <span class="fw-semibold">Development</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Report Generated</span>
+                    <span class="fw-semibold">@DateTime.Now.ToString("dd.MM.yyyy HH:mm")</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🆕 MAINTENANCE ACTIONS -->
+    <div class="row g-3 mt-1">
+        <div class="col-12">
+            <div class="card sc-card p-3">
+                <h6 class="fw-bold mb-1"><i class="bi bi-tools me-1"></i> Maintenance Actions</h6>
+                <p class="text-muted small mb-3">Run housekeeping tasks against the station repository.</p>
+
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <button class="btn btn-outline-primary btn-sm fw-semibold" @onclick="RunDataCleanup" disabled="@_isCleaning">
+                        @if (_isCleaning)
+                        {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        <i class="bi bi-wrench-adjustable-circle me-1"></i> Repair Station Data
+                    </button>
+                    <span class="text-muted small">
+                            Recalculates power totals, normalizes station names, and removes invalid socket entries
+                            left over from malformed Excel imports (e.g. a mis-parsed header row saved as a socket).
+                        </span>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_cleanupFeedback))
+                {
+                <div class="alert alert-info py-2 mt-3 mb-0 small">@_cleanupFeedback</div>
+                }
+            </div>
+        </div>
+    </div>
     }
 </div>
 
 @code {
-    private DashboardStatsDto? _stats;
-    private int _userCount = 0;
-    private SystemStatsDto? _systemStats;
-    private bool _isLoading = true;
+private DashboardStatsDto? _stats;
+private int _userCount = 0;
+private SystemStatsDto? _systemStats;
+private bool _isLoading = true;
 
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            _stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
-            _systemStats = await Http.GetFromJsonAsync<SystemStatsDto>("api/UserManagement/system-stats");
-            var users = await Http.GetFromJsonAsync<List<AdminUserListItemDto>>("api/users");
-            _userCount = users?.Count ?? 0;
-        }
-        catch { /* silent — panel widgets just show blank */ }
-        _isLoading = false;
-    }
+private bool _isCleaning = false;
+private string _cleanupFeedback = "";
+
+protected override async Task OnInitializedAsync()
+{
+try
+{
+_stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
+_systemStats = await Http.GetFromJsonAsync<SystemStatsDto>("api/UserManagement/system-stats");
+var users = await Http.GetFromJsonAsync<List<AdminUserListItemDto>>("api/users");
+_userCount = users?.Count ?? 0;
+}
+catch { /* silent — panel widgets just show blank */ }
+_isLoading = false;
+}
+
+private async Task RunDataCleanup()
+{
+_isCleaning = true;
+_cleanupFeedback = "";
+try
+{
+var response = await Http.PostAsync("api/stations/cleanup-data", null);
+if (response.IsSuccessStatusCode)
+{
+var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+_cleanupFeedback = result != null && result.ContainsKey("message")
+? result["message"]
+: "Cleanup completed.";
+
+// refresh the KPI numbers since socket/power totals may have changed
+_stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/stations/dashboard-stats");
+}
+else
+{
+_cleanupFeedback = $"Cleanup failed (HTTP {(int)response.StatusCode}).";
+}
+}
+catch (Exception ex)
+{
+_cleanupFeedback = $"Error: {ex.Message}";
+}
+finally
+{
+_isCleaning = false;
+}
+}
 }

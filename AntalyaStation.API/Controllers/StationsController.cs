@@ -190,6 +190,7 @@ namespace AntalyaStation.API.Controllers
             var stations = (await _repository.GetAllAsync()).ToList();
             var textInfo = new CultureInfo("tr-TR", false).TextInfo;
             int cleanedCount = 0;
+            int removedSocketCount = 0;
 
             foreach (var s in stations)
             {
@@ -197,6 +198,21 @@ namespace AntalyaStation.API.Controllers
 
                 var newName = textInfo.ToTitleCase(s.StationName.ToLower());
                 if (s.StationName != newName) { s.StationName = newName; isChanged = true; }
+
+                // 🟢 Bozuk Excel importundan kalan "hayalet" soketleri temizle:
+                // gerçek soket numaralarında rakam olur (SKT/2731 gibi); 0 kW olup
+                // içinde hiç rakam olmayan kayıtlar (örn. "Soket No") başlık satırı kalıntısıdır.
+                var validSockets = s.Sockets
+                    .Where(sock => sock.SocketNumber.Any(char.IsDigit) || sock.Power > 0)
+                    .ToList();
+
+                if (validSockets.Count != s.Sockets.Count)
+                {
+                    removedSocketCount += s.Sockets.Count - validSockets.Count;
+                    s.Sockets = validSockets;
+                    s.SocketCount = validSockets.Count;
+                    isChanged = true;
+                }
 
                 var calculatedPower = s.Sockets.Sum(x => x.Power);
                 if (s.TotalPower != calculatedPower) { s.TotalPower = calculatedPower; isChanged = true; }
@@ -207,7 +223,7 @@ namespace AntalyaStation.API.Controllers
                     cleanedCount++;
                 }
             }
-            return Ok(new { Message = $"{cleanedCount} station records successfully cleaned and optimized." });
+            return Ok(new { Message = $"{cleanedCount} station records cleaned. {removedSocketCount} invalid socket entries removed." });
         }
 
         #endregion

@@ -40,6 +40,8 @@ namespace AntalyaStation.API.Models
                 // ve bu istasyon haritada gösterilmez (Map.razor bu kontrolü yapıyor).
                 public double Latitude { get; set; }
                 public double Longitude { get; set; }
+                
+                public DateTime? LastStatusChangeDate { get; set; } 
     }
 
     public class Socket

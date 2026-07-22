@@ -120,7 +120,9 @@ namespace AntalyaStation.API.Repositories
         {
             var update = Builders<Station>.Update
                 .Set(s => s.Status, "Inactive")
-                .Set(s => s.DeactivatedDate, DateTime.Now);
+                .Set(s => s.IsActive, false)
+                .Set(s => s.DeactivatedDate, DateTime.Now)
+                .Set(s => s.LastStatusChangeDate, DateTime.Now);
             var result = await _stations.UpdateOneAsync(s => s.Id == id && s.Status != "Inactive", update);
             return result.ModifiedCount > 0;
         }
@@ -183,7 +185,7 @@ namespace AntalyaStation.API.Repositories
                 return new List<ImportBatchDto>();
 
             return stations
-                .GroupBy(s => string.IsNullOrWhiteSpace(s.ImportBatchId) ? "Eski Kayıtlar / Standart Veri" : s.ImportBatchId)
+                .GroupBy(s => string.IsNullOrWhiteSpace(s.ImportBatchId) ? "Old Records / Standard Data" : s.ImportBatchId)
                 .Select(g => new ImportBatchDto
                 {
                     BatchId = g.Key,
@@ -194,10 +196,11 @@ namespace AntalyaStation.API.Repositories
                     {
                         Id = s.Id ?? string.Empty,
                         StationNumber = s.StationNumber ?? "-",
-                        StationName = s.StationName ?? "İsimsiz İstasyon",
+                        StationName = s.StationName ?? "Unnamed Station",
                         Brand = s.Brand ?? "-",
                         AddedDate = s.AddedDate,
-                        IsActive = s.IsActive || s.Status != "Inactive"
+                        IsActive = s.IsActive || s.Status != "Inactive", 
+                        LastStatusChangeDate = s.LastStatusChangeDate 
                     }).ToList()
                 })
                 .OrderByDescending(b => b.UploadedDate)
@@ -205,28 +208,32 @@ namespace AntalyaStation.API.Repositories
         }
 
 // 🟢 YENİLENMİŞ: Tekil İstasyon Durum Güncellemesi (Hem Status hem IsActive güncellenir)
-public async Task<bool> UpdateStatusAsync(string stationId, bool isActive)
-{
-    var filter = Builders<Station>.Filter.Eq(s => s.Id, stationId);
-    var update = Builders<Station>.Update
-        .Set(s => s.IsActive, isActive)
-        .Set(s => s.Status, isActive ? "Active" : "Inactive");
+        public async Task<bool> UpdateStatusAsync(string stationId, bool isActive)
+        {
+            var filter = Builders<Station>.Filter.Eq(s => s.Id, stationId);
+            var update = Builders<Station>.Update
+                .Set(s => s.IsActive, isActive)
+                .Set(s => s.Status, isActive ? "Active" : "Inactive")
+                .Set(s => s.LastStatusChangeDate, DateTime.Now)
+                .Set(s => s.DeactivatedDate, isActive ? null : DateTime.Now);
 
-    var result = await _stations.UpdateOneAsync(filter, update);
-    return result.ModifiedCount > 0;
-}
+            var result = await _stations.UpdateOneAsync(filter, update);
+            return result.ModifiedCount > 0;
+        }
 
 // 🟢 YENİLENMİŞ: Toplu Batch Durum Güncellemesi
-public async Task<bool> UpdateBatchStatusAsync(string batchId, bool isActive)
-{
-    var filter = Builders<Station>.Filter.Eq(s => s.ImportBatchId, batchId);
-    var update = Builders<Station>.Update
-        .Set(s => s.IsActive, isActive)
-        .Set(s => s.Status, isActive ? "Active" : "Inactive");
+        public async Task<bool> UpdateBatchStatusAsync(string batchId, bool isActive)
+        {
+            var filter = Builders<Station>.Filter.Eq(s => s.ImportBatchId, batchId);
+            var update = Builders<Station>.Update
+                .Set(s => s.IsActive, isActive)
+                .Set(s => s.Status, isActive ? "Active" : "Inactive")
+                .Set(s => s.LastStatusChangeDate, DateTime.Now)
+                .Set(s => s.DeactivatedDate, isActive ? null : DateTime.Now);
 
-    var result = await _stations.UpdateManyAsync(filter, update);
-    return result.ModifiedCount > 0;
-}
+            var result = await _stations.UpdateManyAsync(filter, update);
+            return result.ModifiedCount > 0;
+        }
         // 🟢 YENİ: Belirli bir tarihe eklenen kayıtları siler (gün bazlı, saat dikkate alınmaz)
         public async Task<int> DeactivateByDateAsync(DateTime date)     {
             var startOfDay = date.Date;
