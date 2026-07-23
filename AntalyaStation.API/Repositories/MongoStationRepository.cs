@@ -37,8 +37,10 @@ namespace AntalyaStation.API.Repositories
         public async Task<(List<Station> Data, int TotalCount)> GetFilteredStationsAsync(StationFilterDto filter, int pageNumber, int pageSize)
         {
             var builder = Builders<Station>.Filter;
+// 🟢 DÜZELTME: IncludeInactive=true artık "hepsini göster" değil, "SADECE pasifleri göster" demek.
+// Böylece checkbox işaretlenince aktif/pasif karışık gelmiyor.
             var filterDefinition = filter.IncludeInactive
-                ? builder.Empty
+                ? builder.Eq(s => s.Status, "Inactive")
                 : builder.Ne(s => s.Status, "Inactive");
             if (!string.IsNullOrWhiteSpace(filter.SearchText))
             {

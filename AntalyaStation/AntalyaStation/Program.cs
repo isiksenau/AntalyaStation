@@ -34,6 +34,23 @@ builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>()
 
 builder.Services.AddBlazorBootstrap();
 builder.Services.AddCascadingAuthenticationState();
+
+// 🟢 API'deki ile birebir aynı policy seti — Blazor sayfalarını da bu üzerinden kilitliyoruz
+builder.Services.AddAuthorization(options =>
+{
+    var allKeys = AntalyaStation.API.Models.PermissionCatalog.All
+        .Select(p => p.Key)
+        .Append("ManagePermissions");
+
+    foreach (var key in allKeys)
+    {
+        options.AddPolicy($"Permission.{key}", policy =>
+            policy.RequireAssertion(ctx =>
+                ctx.User.IsInRole("SuperAdmin") ||
+                ctx.User.HasClaim("permission", key)));
+    }
+});
+
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 
 var app = builder.Build();

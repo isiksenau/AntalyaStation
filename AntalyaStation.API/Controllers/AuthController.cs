@@ -36,7 +36,7 @@ public class AuthController : ControllerBase
         if (user == null)
             return Unauthorized(new { Message = "Invalid username or password." });
 
-        var token = GenerateJwtToken(user.Username, user.Role, user.Id!);
+        var token = GenerateJwtToken(user); // 🟢 artık tüm user nesnesini gönderiyoruz, çünkü permission claim'leri de oradan okunuyor
         return Ok(new { Token = token, Message = "Login successful" });
     }
 
@@ -87,8 +87,10 @@ public class AuthController : ControllerBase
         if (!updated) return StatusCode(500, new { Message = "Profile could not be updated." });
 
         // 🟢 Kullanıcı adı değiştiyse yeni bir token üretmemiz lazım — eski token artık geçersiz kullanıcı adını taşıyor
-        var newToken = GenerateJwtToken(dto.Username, user.Role, user.Id!);
-
+// 🟢 Kullanıcı adı değişmiş olabilir, güncel bilgiyle yeni bir User nesnesi oluşturup token'ı ona göre üretiyoruz
+        user.Username = dto.Username;
+        var newToken = GenerateJwtToken(user);
+        
         return Ok(new { Message = "Profile updated successfully.", Token = newToken });
     }
 
@@ -118,32 +120,45 @@ public class AuthController : ControllerBase
         return Ok(new { Message = "Password changed successfully." });
     }
 
-    private string GenerateJwtToken(string username, string role, string userId)
+    // AuthController.cs — GenerateJwtToken metodunu User nesnesi alacak şekilde değiştir
+    private string GenerateJwtToken(User user)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"];
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey!));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, username),
-            new Claim(ClaimTypes.Role, role),
-            new Claim("uid", userId),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(ClaimTypes.Name, user.Username),
+            new(ClaimTypes.Role, user.Role),
+            new("uid", user.Id!),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        // 🟢 SuperAdmin her izne otomatik sahip — DB'de ayrıca tutmaya gerek yok
+        if (user.Role == "SuperAdmin")
+        {
+            foreach (var p in PermissionCatalog.All)
+                claims.Add(new Claim("permission", p.Key));
+            claims.Add(new Claim("permission", "ManagePermissions")); // sadece SuperAdmin'e özel
+        }
+        else
+        {
+            foreach (var p in user.Permissions ?? new List<string>())
+                claims.Add(new Claim("permission", p));
+        }
 
         var token = new JwtSecurityToken(
             issuer: jwtSettings["Issuer"],
             audience: jwtSettings["Audience"],
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["ExpiryInMinutes"]!)),
-            signingCredentials: creds
-        );
+            signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+    
+    
     [HttpPost("create-admin")]
     public async Task<IActionResult> CreateAdmin([FromBody] LoginDto dto)
     {

@@ -33,6 +33,7 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<IUserRepository, MongoUserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<AntalyaStation.API.Services.GeocodingJobState>();
 
 // 🔑 Native OpenAPI + JWT şeması (TEK KEZ, class üzerinden)
 builder.Services.AddOpenApi(options =>
@@ -40,7 +41,6 @@ builder.Services.AddOpenApi(options =>
     options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
 });
 
-// 🔑 JWT Authentication (TEK KEZ)
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -64,7 +64,21 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
-builder.Services.AddAuthorization();
+// 🟢 Her izin key'i için otomatik bir policy üret: "Permission.ViewMaps" gibi
+builder.Services.AddAuthorization(options =>
+{
+    var allKeys = AntalyaStation.API.Models.PermissionCatalog.All
+        .Select(p => p.Key)
+        .Append("ManagePermissions"); // SuperAdmin'e özel, katalogda yok ama policy olarak lazım
+
+    foreach (var key in allKeys)
+    {
+        options.AddPolicy($"Permission.{key}", policy =>
+            policy.RequireAssertion(ctx =>
+                ctx.User.IsInRole("SuperAdmin") ||            // SuperAdmin her zaman geçer
+                ctx.User.HasClaim("permission", key)));       // veya ilgili permission claim'i varsa
+    }
+});
 
 // 💡 CORS servisini ekliyoruz (builder.Build() satırının üstünde olmalı!)
 builder.Services.AddCors();

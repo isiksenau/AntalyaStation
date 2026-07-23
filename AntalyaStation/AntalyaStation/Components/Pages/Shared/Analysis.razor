@@ -2,7 +2,10 @@
 @using AntalyaStation.API.DTOs
 @using System.Linq
 @using ApexCharts
+@using Microsoft.AspNetCore.Authorization
 @inject HttpClient Http
+@attribute [Authorize(Policy = "Permission.ViewAnalytics")]
+
 
 <div class="container-fluid mt-4" style="font-size: 13px;">
     <div class="d-flex justify-content-between align-items-center mb-4">

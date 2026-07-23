@@ -1,11 +1,11 @@
 ﻿@page "/map"
 @using System.Net.Http.Json
-@using System.Collections.Concurrent
-@using System.Threading
+@using Microsoft.AspNetCore.Authorization
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject HttpClient Http
 @inject IJSRuntime JsRuntime
 @implements IAsyncDisposable
+@attribute [Authorize(Policy = "Permission.ViewMaps")]
 
 <style>
     .map-page {
@@ -27,6 +27,7 @@
         z-index: 500;
         display: flex;
         gap: 10px;
+        align-items: center;
     }
     .map-overlay-top-left { left: 16px; }
     .map-overlay-top-right { right: 16px; }
@@ -52,7 +53,7 @@
 
     .map-btn-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.3px; }
 
-    .map-geocode-badge {
+    .map-info-badge {
         background: #0d1b2a;
         color: #fff;
         border-radius: 24px;
@@ -84,20 +85,21 @@
         border: 2px solid #fff;
     }
 
-    /* Kurumsal Marker Stilleri */
+    /* ===== Kurumsal, tek stil marker ===== */
     :global(.station-pin) {
         width: 32px !important;
         height: 32px !important;
         border-radius: 50%;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.35);
-        border: 2px solid white;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+        border: 2.5px solid #fff;
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
         font-size: 11px;
-        font-weight: bold;
-        transition: transform 0.2s ease;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        transition: transform 0.15s ease;
         cursor: pointer;
     }
     :global(.station-pin:hover) {
@@ -105,11 +107,32 @@
         z-index: 1000 !important;
     }
 
+    /* ===== Kurumsal, tek renk cluster baloncuğu (varsayılan yeşil/sarı yerine) ===== */
+    :global(.station-cluster) {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: #0d1b2a;
+        border: 3px solid #fff;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: 800;
+        font-size: 13px;
+    }
+
     :global(.custom-popup .leaflet-popup-content-wrapper) {
         border-radius: 12px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        padding: 4px;
+        padding: 2px;
     }
+    :global(.popup-content) { padding: 6px 4px; min-width: 150px; }
+    :global(.popup-brand) { font-weight: 800; font-size: 13px; margin-bottom: 2px; }
+    :global(.popup-code) { color: #94a3b8; font-size: 11px; font-family: 'Courier New', monospace; margin-bottom: 5px; }
+    :global(.popup-status) { display: inline-block; background: #dcfce7; color: #15803d; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-bottom: 5px; }
+    :global(.popup-district) { font-size: 11.5px; color: #495057; }
 
     /* Paneller & Kartlar */
     .map-nearby-panel, .map-brand-panel {
@@ -185,6 +208,7 @@
     }
     .map-detail-body { flex: 1; min-width: 0; }
     .map-detail-brand-name { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+    .map-detail-code { font-size: 11px; color: #94a3b8; font-family: 'Courier New', monospace; margin-bottom: 6px; }
     .map-detail-socket-list { margin-top: 8px; margin-bottom: 8px; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
     .map-socket-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 6px; background: #f8f9fb; border-radius: 6px; }
     .map-socket-no { font-weight: 700; color: #495057; min-width: 34px; }
@@ -211,11 +235,11 @@
             <i class="bi bi-geo-alt-fill"></i>
         </button>
 
-        @if (isGeocoding)
+        @if (_pendingLocationCount > 0)
         {
-        <div class="map-geocode-badge">
-            <span class="spinner-border spinner-border-sm"></span>
-            <span>Adresler çözümleniyor: @geocodedDone / @geocodeTotal</span>
+        <div class="map-info-badge" title="These stations have no coordinates saved yet and are not shown on the map.">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span>@_pendingLocationCount station(s) awaiting location data</span>
         </div>
         }
     </div>
@@ -246,7 +270,7 @@
     {
     <div class="map-brand-panel">
         <div class="map-nearby-header">
-            <span>Markaya Göre Filtrele</span>
+            <span>Filter by Brand</span>
             <button class="map-panel-close" @onclick="ToggleBrandPanel"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="map-brand-list">
@@ -262,7 +286,7 @@
         @if (selectedBrands.Any())
         {
         <div class="map-brand-footer">
-            <button class="btn btn-sm btn-outline-secondary w-100" @onclick="ClearBrandFilter">Filtreyi Temizle</button>
+            <button class="btn btn-sm btn-outline-secondary w-100" @onclick="ClearBrandFilter">Clear Filter</button>
         </div>
         }
     </div>
@@ -272,17 +296,17 @@
     {
     <div class="map-nearby-panel">
         <div class="map-nearby-header">
-            <span>Yakındaki İstasyonlar</span>
+            <span>Nearby Stations</span>
             <button class="map-panel-close" @onclick="ToggleNearbyPanel"><i class="bi bi-x-lg"></i></button>
         </div>
 
         @if (isLocating)
         {
-        <div class="map-nearby-empty"><span class="spinner-border spinner-border-sm me-2"></span> Konumunuz bulunuyor...</div>
+        <div class="map-nearby-empty"><span class="spinner-border spinner-border-sm me-2"></span> Locating you...</div>
         }
         else if (!nearbyStations.Any())
         {
-        <div class="map-nearby-empty">Yakındaki istasyonları görmek için sol üstteki konum butonuna tıklayın.</div>
+        <div class="map-nearby-empty">Tap the location button on the top left to see nearby stations.</div>
         }
         else
         {
@@ -313,6 +337,7 @@
         <div class="map-detail-body">
             <div class="map-detail-brand-name" style="color:@GetBrandColor(selectedStation.Brand)">@selectedStation.Brand</div>
             <div class="map-detail-name">@selectedStation.StationName</div>
+            <div class="map-detail-code">#@DisplayCode(selectedStation.StationNumber)</div>
             <div class="map-detail-sub">@selectedStation.Address</div>
 
             <div class="map-detail-socket-list">
@@ -320,15 +345,15 @@
                 {
                 <div class="map-socket-row">
                     <span class="map-socket-no">#@(string.IsNullOrWhiteSpace(socket.SocketNumber) ? "-" : socket.SocketNumber)</span>
-                    <span class="map-tag @(socket.Type.ToUpperInvariant().Contains("DC") ? "map-tag-dc" : "map-tag-ac")">@socket.Type</span>
+                    <span class="map-tag @(SocketCategory(socket.Type) == "DC" ? "map-tag-dc" : "map-tag-ac")">@PrettySocketType(socket.Type)</span>
                     <span class="map-socket-power">@socket.Power.ToString("0.#") kW</span>
                 </div>
                 }
             </div>
 
             <div class="map-detail-tags">
-                <span class="map-tag map-tag-power">Toplam: @selectedStation.TotalPower.ToString("0") kW</span>
-                <span class="map-tag">@selectedStation.Sockets.Count soket</span>
+                <span class="map-tag map-tag-power">Total: @selectedStation.TotalPower.ToString("0") kW</span>
+                <span class="map-tag">@selectedStation.Sockets.Count socket(s)</span>
             </div>
         </div>
     </div>
@@ -339,6 +364,7 @@
 private const double DefaultLat = 36.8969;
 private const double DefaultLng = 30.7133;
 
+// 🟢 Bilinen büyük operatörler için gerçek marka renkleri
 private static readonly Dictionary<string, string> BrandColors = new(StringComparer.OrdinalIgnoreCase)
 {
 { "Shell", "#FFD500" }, { "Opet", "#005BBB" }, { "BP", "#009640" },
@@ -347,9 +373,15 @@ private static readonly Dictionary<string, string> BrandColors = new(StringCompa
 { "Voltrun", "#E91E63" }, { "Tesla", "#E31937" }, { "Astor Charge", "#F47920" }
 };
 
+// 🟢 Sözlükte olmayan markalar için sabit ama hoş bir yedek palet (artık hepsi gri değil)
+private static readonly string[] FallbackPalette =
+{
+"#4C6FFF", "#00B8A9", "#F86624", "#662E9B", "#EA3546",
+"#43BCCD", "#F9C80E", "#2E86AB", "#E4572E", "#6A4C93", "#1B998B", "#C05299"
+};
+
 private List<MapStationDto> allStations = new();
 private List<MapStationDto> visibleStations = new();
-private readonly HashSet<string> _idsNeedingGeocode = new();
 
 private bool isDarkMode = false;
 private string currentFilter = "All";
@@ -363,12 +395,8 @@ private HashSet<string> selectedBrands = new();
 private List<string> allBrands = new();
 private bool showBrandPanel = false;
 
-private static readonly ConcurrentDictionary<string, (double Lat, double Lng)> _geocodeCache = new();
-private static readonly ConcurrentDictionary<string, (double Lat, double Lng)> _mahalleCache = new();
-
-private bool isGeocoding = false;
-private int geocodedDone = 0;
-private int geocodeTotal = 0;
+// 🟢 Sahte/uydurma koordinat üretmiyoruz — gerçek konumu olmayan istasyon sayısını gösteriyoruz
+private int _pendingLocationCount = 0;
 
 private MapStationDto? selectedStation;
 private DotNetObjectReference<Map>? dotNetRef;
@@ -384,7 +412,6 @@ var (lat, lng) = GetInitialCenter();
 await JsRuntime.InvokeVoidAsync("mapInterop.init", "station-map", lat, lng, 12);
 
 await RenderMarkersBatch();
-_ = GeocodeStationsInBackgroundAsync();
 }
 }
 
@@ -410,163 +437,16 @@ allBrands = allStations
 .OrderBy(b => b)
 .ToList();
 
-ApplyFallbackCoordinates();
+// 🟢 Uydurma koordinat üretmek yerine, gerçek konumu olmayanları sayıyoruz.
+// Bu sayı, Control Panel'deki "Resolve Missing Locations" ile sıfırlanabilir.
+_pendingLocationCount = allStations.Count(s => s.Latitude == 0 && s.Longitude == 0);
 }
 catch { allStations = new(); }
 }
 
-private async Task GeocodeStationsInBackgroundAsync()
-{
-var targets = allStations.Where(s => !string.IsNullOrWhiteSpace(s.Address) && !string.IsNullOrEmpty(s.Id) && _idsNeedingGeocode.Contains(s.Id)).ToList();
-if (!targets.Any()) return;
-
-isGeocoding = true;
-geocodedDone = 0;
-geocodeTotal = targets.Count;
-await InvokeAsync(StateHasChanged);
-
-using var geoClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-geoClient.DefaultRequestHeaders.UserAgent.ParseAdd("AntalyaStationApp/1.0");
-
-var semaphore = new SemaphoreSlim(5);
-
-var tasks = targets.Select(async station =>
-{
-await semaphore.WaitAsync();
-try
-{
-var fullAddress = station.Address;
-if (string.IsNullOrWhiteSpace(fullAddress)) return;
-
-var mahalle = ExtractMahalle(fullAddress);
-if (_geocodeCache.TryGetValue(fullAddress, out var cached))
-{
-station.Latitude = cached.Lat; station.Longitude = cached.Lng;
-return;
-}
-
-if (!string.IsNullOrEmpty(mahalle) && _mahalleCache.TryGetValue(mahalle, out var mCached))
-{
-station.Latitude = mCached.Lat; station.Longitude = mCached.Lng;
-_geocodeCache[fullAddress] = mCached;
-return;
-}
-
-var candidates = BuildGeocodeCandidates(station);
-foreach (var candidateQuery in candidates)
-{
-try
-{
-var url = $"https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=tr&bounded=1&viewbox=29.1,37.6,32.6,36.0&q={Uri.EscapeDataString(candidateQuery)}";
-var response = await geoClient.GetFromJsonAsync<List<NominatimResult>>(url);
-var match = response?.FirstOrDefault();
-
-if (match != null &&
-double.TryParse(match.lat, System.Globalization.CultureInfo.InvariantCulture, out var geoLat) &&
-double.TryParse(match.lon, System.Globalization.CultureInfo.InvariantCulture, out var geoLng))
-{
-station.Latitude = geoLat;
-station.Longitude = geoLng;
-
-_geocodeCache[fullAddress] = (geoLat, geoLng);
-if (!string.IsNullOrEmpty(mahalle)) _mahalleCache[mahalle] = (geoLat, geoLng);
-
-break;
-}
-}
-catch { }
-}
-}
-finally
-{
-Interlocked.Increment(ref geocodedDone);
-if (geocodedDone % 10 == 0) await InvokeAsync(StateHasChanged);
-semaphore.Release();
-}
-});
-
-await Task.WhenAll(tasks);
-
-isGeocoding = false;
-await RenderMarkersBatch();
-await InvokeAsync(StateHasChanged);
-}
-
-private class NominatimResult
-{
-public string lat { get; set; } = string.Empty;
-public string lon { get; set; } = string.Empty;
-}
-
-private static string CleanAddressForGeocoding(string address) => System.Text.RegularExpressions.Regex.Replace(address, @"\s+", " ").Trim();
-
-private static string? ExtractMahalle(string address)
-{
-var match = System.Text.RegularExpressions.Regex.Match(address, @"(.*?Mahallesi)");
-return match.Success ? match.Groups[1].Value.Trim() : null;
-}
-
-private static string? ExtractCadde(string address)
-{
-var match = System.Text.RegularExpressions.Regex.Match(address, @"(.*?Caddesi|.*?Sokak|.*?Bulvarı)");
-return match.Success ? match.Groups[1].Value.Trim() : null;
-}
-
-private static List<string> BuildGeocodeCandidates(MapStationDto station)
-{
-var candidates = new List<string>();
-var cleaned = CleanAddressForGeocoding(station.Address);
-var mahalle = ExtractMahalle(station.Address);
-var cadde = ExtractCadde(station.Address);
-var ilce = station.District;
-
-candidates.Add(cleaned);
-
-var noRemoved = System.Text.RegularExpressions.Regex.Replace(cleaned, @"No:\s*\S+", "").Trim();
-if (noRemoved != cleaned) candidates.Add(noRemoved);
-
-if (!string.IsNullOrWhiteSpace(cadde) && !string.IsNullOrWhiteSpace(mahalle) && !string.IsNullOrWhiteSpace(ilce))
-candidates.Add($"{cadde}, {mahalle}, {ilce}, Antalya");
-
-if (!string.IsNullOrWhiteSpace(mahalle) && !string.IsNullOrWhiteSpace(ilce))
-candidates.Add($"{mahalle}, {ilce}, Antalya");
-
-if (!string.IsNullOrWhiteSpace(mahalle))
-candidates.Add($"{mahalle}, Antalya");
-
-if (!string.IsNullOrWhiteSpace(ilce))
-candidates.Add($"{ilce}, Antalya");
-
-return candidates.Distinct().ToList();
-}
-
-private void ApplyFallbackCoordinates()
-{
-for (var i = 0; i < allStations.Count; i++)
-{
-var station = allStations[i];
-if (station.Latitude != 0 || station.Longitude != 0) continue;
-
-if (!string.IsNullOrEmpty(station.Id)) _idsNeedingGeocode.Add(station.Id);
-
-var offset = (i % 25) * 0.003;
-station.Latitude = station.District switch
-{
-"Kepez" => 36.918 + offset, "Konyaaltı" => 36.870 + offset, "Muratpaşa" => 36.884 + offset,
-"Aksu" => 36.945 + offset, "Döşemealtı" => 37.020 + offset, "Serik" => 36.916 + offset,
-"Manavgat" => 36.786 + offset, "Alanya" => 36.545 + offset, _ => DefaultLat + offset
-};
-station.Longitude = station.District switch
-{
-"Kepez" => 30.720 + offset, "Konyaaltı" => 30.635 + offset, "Muratpaşa" => 30.705 + offset,
-"Aksu" => 30.845 + offset, "Döşemealtı" => 30.602 + offset, "Serik" => 31.098 + offset,
-"Manavgat" => 31.443 + offset, "Alanya" => 31.999 + offset, _ => DefaultLng + offset
-};
-}
-}
-
 private async Task RenderMarkersBatch()
 {
+// 🟢 Sadece GERÇEK koordinatı olan istasyonlar haritaya basılır.
 visibleStations = allStations
 .Where(s => s.Latitude != 0 && s.Longitude != 0 && s.Status != "Inactive" && MatchesFilter(s))
 .ToList();
@@ -580,8 +460,8 @@ brand = s.Brand,
 name = s.StationName,
 district = s.District,
 color = GetBrandColor(s.Brand),
-code = DisplayCode(s.Id),
-status = s.Status == "Active" ? "Aktif" : "Pasif",
+code = DisplayCode(s.StationNumber),
+status = s.Status == "Active" ? "Active" : "Passive",
 initials = GetBrandInitials(s.Brand)
 }).ToList();
 
@@ -593,19 +473,33 @@ else if (showNearbyPanel)
 nearbyStations = visibleStations.OrderBy(s => s.StationName).Select(s => (Station: s, DistanceKm: 0.0)).ToList();
 }
 
+// 🟢 AC/DC eşleştirmesi tek yerden, tutarlı biçimde yapılıyor.
+private static string SocketCategory(string? rawType)
+{
+if (string.IsNullOrWhiteSpace(rawType)) return "AC";
+return rawType.ToUpperInvariant().Contains("DC") ? "DC" : "AC";
+}
+
+// 🟢 "AC_TYPE2" -> "AC 2", "DC_CCS2" -> "DC CCS2" gibi temiz gösterim
+private static string PrettySocketType(string? rawType)
+{
+if (string.IsNullOrWhiteSpace(rawType)) return "-";
+
+var upper = rawType.Trim().ToUpperInvariant();
+var prefix = upper.Contains("DC") ? "DC" : "AC";
+
+var rest = upper.Replace("_", " ").Replace(prefix, "").Trim();
+rest = System.Text.RegularExpressions.Regex.Replace(rest, @"^TYPE\s*", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+
+return string.IsNullOrWhiteSpace(rest) ? prefix : $"{prefix} {rest}";
+}
+
 private bool MatchesFilter(MapStationDto s)
 {
 if (selectedBrands.Any() && !selectedBrands.Contains(s.Brand)) return false;
 if (currentFilter == "All") return true;
 
-return s.Sockets.Any(x =>
-{
-if (string.IsNullOrWhiteSpace(x.Type)) return false;
-var type = x.Type.ToUpperInvariant();
-if (currentFilter == "DC") return type.Contains("DC");
-if (currentFilter == "AC") return type.Contains("AC") && !type.Contains("DC");
-return false;
-});
+return s.Sockets.Any(x => SocketCategory(x.Type) == currentFilter);
 }
 
 [JSInvokable]
@@ -651,17 +545,22 @@ if (showNearbyPanel) showBrandPanel = false;
 if (showNearbyPanel && userLat == null) nearbyStations = visibleStations.OrderBy(s => s.StationName).Select(s => (Station: s, DistanceKm: 0.0)).ToList();
 }
 
-private string DisplayCode(string? code)
+// 🟢 Artık Mongo Id değil, gerçek işletme kodu (StationNumber) gösteriliyor. Örn: SKT/12406 -> SKT-12406
+private static string DisplayCode(string? stationNumber)
 {
-if (string.IsNullOrWhiteSpace(code)) return "";
-var parts = code.Split('/');
-return parts.Length > 1 ? parts[^1] : code.TrimStart('#');
+if (string.IsNullOrWhiteSpace(stationNumber)) return "N/A";
+return stationNumber.Replace('/', '-').Trim();
 }
 
 private string GetBrandColor(string? brand)
 {
 if (string.IsNullOrWhiteSpace(brand)) return "#5F6368";
-return BrandColors.TryGetValue(brand, out var color) ? color : "#5F6368";
+if (BrandColors.TryGetValue(brand, out var known)) return known;
+
+// Bilinmeyen markalar için hep aynı (deterministik) ama gri olmayan bir renk
+var hash = 0;
+foreach (var c in brand) hash = c + ((hash << 5) - hash);
+return FallbackPalette[Math.Abs(hash) % FallbackPalette.Length];
 }
 
 private string GetBrandInitials(string? brand) => string.IsNullOrEmpty(brand) ? "??" : brand.Length >= 2 ? brand[..2].ToUpper() : brand.ToUpper();
@@ -687,6 +586,7 @@ private class StationsApiResult { public List<MapStationDto> Data { get; set; } 
 private class MapStationDto
 {
 public string? Id { get; set; }
+public string StationNumber { get; set; } = string.Empty;
 public string StationName { get; set; } = string.Empty;
 public string Brand { get; set; } = string.Empty;
 public string Address { get; set; } = string.Empty;

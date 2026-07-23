@@ -12,9 +12,11 @@ public class ExcelImportService : IExcelImportService
 {
     private readonly IStationRepository _stationRepository;
 
+// 🟢 "Akseki" eksikti — bu yüzden Akseki adresli istasyonlar tanınmıyor ve
+// otomatik olarak "Belirtilmemiş" olarak kaydediliyordu, düzeltildi.
     private static readonly List<string> KnownDistricts = new()
     {
-        "Aksu", "Alanya", "Döşemealtı", "Elmalı", "Finike", "Gazipaşa", "Gündoğmuş",
+        "Akseki", "Aksu", "Alanya", "Döşemealtı", "Elmalı", "Finike", "Gazipaşa", "Gündoğmuş",
         "İbradı", "Demre", "Kaş", "Kemer", "Kepez", "Konyaaltı", "Korkuteli",
         "Kumluca", "Manavgat", "Muratpaşa", "Serik"
     };
@@ -197,7 +199,8 @@ public class ExcelImportService : IExcelImportService
     private (string City, string District) ExtractCityAndDistrict(string? address)
     {
         string city = "Belirtilmemiş";
-        string district = "Belirtilmemiş";
+        // 🟢 Artık hiçbir ilçe eşleşmezse "Belirtilmemiş" yerine "Merkez" varsayılıyor
+        string district = "Merkez";
 
         if (string.IsNullOrWhiteSpace(address)) return (city, district);
 
@@ -210,7 +213,7 @@ public class ExcelImportService : IExcelImportService
             if (matchedDistrict != null) district = matchedDistrict;
         }
 
-        if (district == "Belirtilmemiş")
+        if (district == "Merkez")
         {
             var matchedDistrict = KnownDistricts.FirstOrDefault(d => address.Contains(d, StringComparison.OrdinalIgnoreCase));
             if (matchedDistrict != null) district = matchedDistrict;

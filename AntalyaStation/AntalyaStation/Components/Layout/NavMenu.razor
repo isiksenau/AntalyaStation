@@ -19,21 +19,29 @@
         </div>
 
         <!-- 📊 Analytics -->
+        <AuthorizeView Policy="Permission.ViewAnalytics">
+        <Authorized>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="analysis">
                 <span class="bi bi-bar-chart-line-fill-nav-menu" aria-hidden="true"></span> Analytics
             </NavLink>
         </div>
+        </Authorized>
+        </AuthorizeView>
 
         <!-- 📋 View Data -->
+        <AuthorizeView Policy="Permission.ViewData">
+        <Authorized>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="view-data">
                 <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> View Data
             </NavLink>
         </div>
+        </Authorized>
+        </AuthorizeView>
 
         <!-- 🗂️ Data Import (Doğrudan Tek Tık Link) -->
-        <AuthorizeView Roles="Admin,SuperAdmin">
+        <AuthorizeView Policy="Permission.DataImport">
             <Authorized>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin/import-data">
@@ -44,44 +52,56 @@
         </AuthorizeView>
 
         <!-- 🗺️ Maps -->
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="map">
-                <span class="bi bi-map-fill-nav-menu" aria-hidden="true"></span> Maps
-            </NavLink>
-        </div>
-
-        <!-- 👑 Admin Management (Admin Only, Group) -->
-        <AuthorizeView Roles="Admin,SuperAdmin" Context="adminMenuContext">
+        <AuthorizeView Policy="Permission.ViewMaps">
             <Authorized>
                 <div class="nav-item px-3">
-                    <div class="nav-link custom-dropdown-toggle" @onclick="ToggleAdmin" style="cursor: pointer;">
-                        <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> Admin Management
-                        <span class="ms-auto bi @(isAdminOpen ? "bi-chevron-up" : "bi-chevron-down")"></span>
-                    </div>
-
-                    @if (isAdminOpen)
-                    {
-                        <div class="submenu-container ps-4">
-                            <NavLink class="nav-link submenu-link" href="admin/control-panel">
-                                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> System Console
-                            </NavLink>
-
-                            <AuthorizeView Roles="SuperAdmin" Context="superAdminContext">
-                                <Authorized>
-                                    <NavLink class="nav-link submenu-link" href="admin/Permissions">
-                                        <span class="bi bi-key-fill-nav-menu" aria-hidden="true"></span> Admin Permissions
-                                    </NavLink>
-                                </Authorized>
-                            </AuthorizeView>
-
-                            <NavLink class="nav-link submenu-link" href="admin/user-management">
-                                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> User Management
-                            </NavLink>
-                        </div>
-                    }
+                    <NavLink class="nav-link" href="map">
+                        <span class="bi bi-map-fill-nav-menu"></span> Maps
+                    </NavLink>
                 </div>
             </Authorized>
         </AuthorizeView>
+
+        <!-- 👑 Admin Management (Grup) -->
+        @* 🟢 Artık Role değil, kullanıcının sahip olduğu permission claim'lerine göre gösteriliyor.
+     Bu sayede "User" rolündeki biri de SuperAdmin ona izin verirse admin sayfalarını görebilir. *@
+        @if (_showAdminGroup)
+        {
+            <div class="nav-item px-3">
+                <div class="nav-link custom-dropdown-toggle" @onclick="ToggleAdmin" style="cursor: pointer;">
+                    <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> Admin Management
+                    <span class="ms-auto bi @(isAdminOpen ? "bi-chevron-up" : "bi-chevron-down")"></span>
+                </div>
+
+                @if (isAdminOpen)
+                {
+                    <div class="submenu-container ps-4">
+
+                        @if (_canSystemConsole)
+                        {
+                            <NavLink class="nav-link submenu-link" href="admin/control-panel">
+                                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> System Console
+                            </NavLink>
+                        }
+
+                        @if (_isSuperAdmin)
+                        {
+                            <NavLink class="nav-link submenu-link" href="admin/Permissions">
+                                <span class="bi bi-key-fill-nav-menu" aria-hidden="true"></span> Admin Permissions
+                            </NavLink>
+                        }
+
+                        @if (_canManageUsers)
+                        {
+                            <NavLink class="nav-link submenu-link" href="admin/user-management">
+                                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> User Management
+                            </NavLink>
+                        }
+
+                    </div>
+                }
+            </div>
+        }
 
         <!-- ⚙️ Profile & Settings (Group) -->
         <div class="nav-item px-3">
@@ -107,9 +127,45 @@
 </div>
 
 @code {
+
+
+        // 🟢 Cascading olarak MainLayout'tan gelen authentication state
+        [CascadingParameter]
+        private Task<AuthenticationState>? AuthStateTask {
+        get;
+        set;
+    }
+
     private bool isAdminOpen = false;
     private bool isSettingsOpen = false;
 
+    private bool _canDataImport;
+    private bool _canSystemConsole;
+    private bool _canManageUsers;
+    private bool _isSuperAdmin;
+    private bool _showAdminGroup;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask == null) return;
+
+        var authState = await AuthStateTask;
+        var user = authState.User;
+
+        // 🟢 SuperAdmin her zaman tüm admin izinlerine sahip sayılır
+        _isSuperAdmin = user.IsInRole("SuperAdmin");
+
+        // 🟢 Her link Role'e değil, doğrudan JWT'deki "permission" claim'ine bakıyor
+        _canDataImport = _isSuperAdmin || user.HasClaim("permission", "DataImport");
+        _canSystemConsole = _isSuperAdmin || user.HasClaim("permission", "SystemConsole");
+        _canManageUsers = _isSuperAdmin || user.HasClaim("permission", "ManageUsers");
+
+        // 🟢 Boş panel sorununu çözen satır: en az bir link görünüyorsa grup başlığı da görünür,
+        // hiçbiri yoksa (SuperAdmin de değilse) grup tamamen gizlenir
+        _showAdminGroup = _canDataImport || _canSystemConsole || _canManageUsers || _isSuperAdmin;
+    }
+
     private void ToggleAdmin() => isAdminOpen = !isAdminOpen;
     private void ToggleSettings() => isSettingsOpen = !isSettingsOpen;
+}
 }

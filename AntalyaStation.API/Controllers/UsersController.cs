@@ -1,4 +1,4 @@
-﻿using AntalyaStation.API.DTOs;
+﻿/*using AntalyaStation.API.DTOs;
 using AntalyaStation.API.Models;
 using AntalyaStation.API.Repositories;
 using AntalyaStation.API.Services;
@@ -40,6 +40,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "Permission.ManageUsers")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.Username) || string.IsNullOrWhiteSpace(dto.Password))
@@ -71,11 +72,16 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id}/role")]
-    public async Task<IActionResult> UpdateRole(string id, [FromBody] UpdateUserRoleDto dto)
-    {
-        if (dto.Role != "Admin" && dto.Role != "User")
-            return BadRequest(new { Message = "Role must be either 'Admin' or 'User'." });
+[Authorize(Policy = "Permission.ManageUsers")]
+public async Task<IActionResult> UpdateRole(string id, [FromBody] UpdateUserRoleDto dto)
+{
+    // 🟢 GÜVENLİK: Bu eski endpoint SuperAdmin kontrolü yapmıyordu, UserManagementController'daki
+    // ile aynı kurala bağlıyoruz — Admin rolü sadece SuperAdmin tarafından atanabilir.
+    if (dto.Role == "Admin" && !User.IsInRole("SuperAdmin"))
+        return Forbid();
 
+    if (dto.Role != "Admin" && dto.Role != "User")
+        return BadRequest(new { Message = "Role must be either 'Admin' or 'User'." });
         var updated = await _userRepository.UpdateRoleAsync(id, dto.Role);
         if (!updated) return NotFound(new { Message = "User not found." });
 
@@ -83,6 +89,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = "Permission.ManageUsers")]
     public async Task<IActionResult> DeleteUser(string id)
     {
         var currentUsername = User.Identity?.Name;
@@ -96,4 +103,4 @@ public class UsersController : ControllerBase
 
         return Ok(new { Message = "User deleted successfully." });
     }
-}
+}*/

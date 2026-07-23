@@ -8,7 +8,7 @@ namespace AntalyaStation.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,SuperAdmin")]
+[Authorize(Roles = "SuperAdmin")] // 🔴 SADECE SuperAdmin çağırabilir!
 public class PermissionsController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
@@ -18,7 +18,6 @@ public class PermissionsController : ControllerBase
         _userRepository = userRepository;
     }
 
-    // 🟢 Sistemde tanımlı tüm izinleri ve varsayılan şablonları döner
     [HttpGet("catalog")]
     public IActionResult GetCatalog()
     {
@@ -38,23 +37,25 @@ public class PermissionsController : ControllerBase
         return Ok(response);
     }
 
-    // 🟢 Tüm kullanıcıları izinleriyle birlikte listeler
     [HttpGet("users")]
     public async Task<IActionResult> GetAllUserPermissions()
     {
         var users = await _userRepository.GetAllAsync();
-        var result = users.Select(u => new UserPermissionsDto
-        {
-            UserId = u.Id!,
-            Username = u.Username,
-            Role = u.Role,
-            Permissions = u.Permissions ?? new List<string>()
-        }).ToList();
+        
+        // SuperAdmin'ler bu izin listesinde görünmez (SuperAdmin izinleri sabittir)
+        var result = users
+            .Where(u => u.Role != "SuperAdmin")
+            .Select(u => new UserPermissionsDto
+            {
+                UserId = u.Id!,
+                Username = u.Username,
+                Role = u.Role,
+                Permissions = u.Permissions ?? new List<string>()
+            }).ToList();
 
         return Ok(result);
     }
 
-    // 🟢 Belirli bir kullanıcının izinlerini günceller (tek tek ekle/çıkar)
     [HttpPut("users/{id}")]
     public async Task<IActionResult> UpdateUserPermissions(string id, [FromBody] UpdateUserPermissionsDto dto)
     {
@@ -67,7 +68,6 @@ public class PermissionsController : ControllerBase
         return Ok(new { Message = "Permissions updated successfully.", Permissions = filteredPermissions });
     }
 
-    // 🟢 Kullanıcıya varsayılan (rolüne göre) izin şablonunu uygular
     [HttpPost("users/{id}/apply-default")]
     public async Task<IActionResult> ApplyDefaultPermissions(string id)
     {

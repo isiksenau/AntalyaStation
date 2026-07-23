@@ -79,22 +79,34 @@ namespace AntalyaStation.Client.Handlers
             NotifyAuthenticationStateChanged(authState);
         }
 
+// AntalyaStation.Client/Handlers/CustomAuthStateProvider.cs
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
         {
             var payload = jwt.Split('.')[1];
             var jsonBytes = ParseBase64WithoutPadding(payload);
-            var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
+            var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonBytes);
+            var claims = new List<Claim>();
+            if (keyValuePairs == null) return claims;
 
-            if (keyValuePairs == null) return Array.Empty<Claim>();
-            var claims = keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value?.ToString() ?? string.Empty)).ToList();
+            foreach (var kvp in keyValuePairs)
+            {
+                // 🟢 "permission" gibi çoklu değerli claim'ler JWT'de JSON dizisi olarak saklanır
+                if (kvp.Value.ValueKind == JsonValueKind.Array)
+                    foreach (var item in kvp.Value.EnumerateArray())
+                        claims.Add(new Claim(kvp.Key, item.ToString()));
+                else
+                    claims.Add(new Claim(kvp.Key, kvp.Value.ToString()));
+            }
 
-            var roleValue = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role || c.Type == "role")?.Value;
-            if (!string.IsNullOrWhiteSpace(roleValue) && claims.All(c => c.Type != "role"))
-                claims.Add(new Claim("role", roleValue));
-            if (!string.IsNullOrWhiteSpace(roleValue) && claims.All(c => c.Type != ClaimTypes.Role))
-                claims.Add(new Claim(ClaimTypes.Role, roleValue));
-
-            return claims;        }
+            var roleValue = claims.FirstOrDefault(c => c.Type is ClaimTypes.Role or "role")?.Value;
+            if (!string.IsNullOrWhiteSpace(roleValue))
+            {
+                if (claims.All(c => c.Type != "role")) claims.Add(new Claim("role", roleValue));
+                if (claims.All(c => c.Type != ClaimTypes.Role)) claims.Add(new Claim(ClaimTypes.Role, roleValue));
+            }
+            return claims;
+        }
+        
 
         private byte[] ParseBase64WithoutPadding(string base64)
         {

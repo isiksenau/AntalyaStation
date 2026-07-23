@@ -1,4 +1,5 @@
 ﻿using AntalyaStation.API.DTOs;
+using AntalyaStation.API.Models;
 using AntalyaStation.API.Repositories;
 using AntalyaStation.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,10 @@ namespace AntalyaStation.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,SuperAdmin")]
+// 🟢 Class-level Role kısıtlaması kaldırıldı — artık her action kendi Policy'sini
+// (Permission.ManageUsers / Permission.SystemConsole) taşıyor. Class'ta Role olursa
+// Policy'yi geçen ama Admin/SuperAdmin olmayan (permission verilmiş "User") kişiler
+// yine de AND mantığıyla 403 alırdı.
 public class UserManagementController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
@@ -27,12 +31,22 @@ public class UserManagementController : ControllerBase
         _stationRepository = stationRepository;
         _excelImportService = excelImportService;
     }
-
+    
     [HttpGet]
+    [Authorize(Policy = "Permission.ManageUsers")]
     public async Task<IActionResult> GetAllUsers()
     {
         var users = await _userRepository.GetAllAsync();
-        var result = users.Select(u => new UserListItemDto
+
+        // Filtreyi doğrudan sorgu akışına ekliyoruz
+        var query = users.AsEnumerable();
+
+        if (!User.IsInRole("SuperAdmin"))
+        {
+            query = query.Where(u => u.Role != "SuperAdmin");
+        }
+
+        var result = query.Select(u => new UserListItemDto
         {
             Id = u.Id!,
             Username = u.Username,
@@ -46,10 +60,10 @@ public class UserManagementController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "Permission.ManageUsers")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
-        // 🟢 Rol atama yetkisi kontrolü — Admin sadece "User" oluşturabilir,
-        // "Admin" rolüyle kullanıcı oluşturmak sadece SuperAdmin'e açık.
+        // 🟢 Rol Atama Kontrolü: Admin -> Sadece "User", SuperAdmin -> "Admin" veya "User"
         if (!CanAssignRole(dto.Role))
             return Forbid();
 
@@ -59,12 +73,28 @@ public class UserManagementController : ControllerBase
         if (!success)
             return BadRequest(new { Message = error });
 
+        // 🟢 OTOMATİK İZİN ATAMA: Rolüne göre varsayılan izin setini atayalım
+        var defaultPermissions = dto.Role == "Admin" 
+            ? PermissionCatalog.DefaultAdminPermissions 
+            : PermissionCatalog.DefaultUserPermissions;
+
+        await _userRepository.UpdatePermissionsAsync(user!.Id!, defaultPermissions);
+
         return Ok(new { Message = "User created successfully.", UserId = user!.Id });
     }
 
     [HttpPut("{id}/role")]
+    [Authorize(Policy = "Permission.ManageUsers")]
+
     public async Task<IActionResult> UpdateRole(string id, [FromBody] UpdateUserRoleDto dto)
     {
+        var targetUser = await _userRepository.GetByIdAsync(id);
+        if (targetUser == null) return NotFound(new { Message = "User not found." });
+
+        // Normal Admin, SuperAdmin kullanıcısının rolünü değiştiremez
+        if (targetUser.Role == "SuperAdmin" && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
         if (!CanAssignRole(dto.Role))
             return Forbid();
 
@@ -75,8 +105,13 @@ public class UserManagementController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = "Permission.ManageUsers")]
     public async Task<IActionResult> DeleteUser(string id)
     {
+        var targetUser = await _userRepository.GetByIdAsync(id);
+        if (targetUser != null && targetUser.Role == "SuperAdmin" && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
         var deleted = await _userRepository.DeleteAsync(id);
         if (!deleted) return NotFound(new { Message = "User not found." });
 
@@ -84,6 +119,8 @@ public class UserManagementController : ControllerBase
     }
 
     [HttpGet("system-stats")]
+    [Authorize(Policy = "Permission.SystemConsole")]  // 🟢 Bu endpoint ControlPanel.razor tarafından kullanılıyor, ManageUsers değil SystemConsole gerekiyor
+
     public async Task<IActionResult> GetSystemStats()
     {
         var stations = (await _stationRepository.GetAllAsync()).ToList();
@@ -106,12 +143,21 @@ public class UserManagementController : ControllerBase
         return Ok(stats);
     }
 
-    // 🟢 TEK BİR TANE — Admin sadece "User" rolü atayabilir,
-    // "Admin" rolü atamak sadece SuperAdmin yetkisiyle mümkün.
-    private bool CanAssignRole(string? role)
+    // 🟢 ROL ATAMA YETKİ KURALI
+    private bool CanAssignRole(string? targetRole)
     {
-        if (role == "User") return true;
-        if (role == "Admin") return User.IsInRole("SuperAdmin");
-        return false;
+        if (string.IsNullOrWhiteSpace(targetRole)) return false;
+
+        // "SuperAdmin" rolü API üzerinden yeni kimseye atanamaz
+        if (targetRole == "SuperAdmin") return false;
+
+        // Normal Admin SADECE "User" oluşturabilir
+        if (!User.IsInRole("SuperAdmin"))
+        {
+            return targetRole == "User";
+        }
+
+        // SuperAdmin hem "Admin" hem "User" oluşturabilir
+        return targetRole == "User" || targetRole == "Admin";
     }
 }
